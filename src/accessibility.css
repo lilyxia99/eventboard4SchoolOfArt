@@ -1,0 +1,29 @@
+/* Keep supporting labels readable while preserving the small editorial caps. */
+:root { --paper: #f5f7fa; --line: #cbd2dd; }
+.events-section { background: #e9edf3; }
+.hero-art { background: #e3e9f2; }
+.section-heading { border-color: #c7d0dd; }
+.event-poster { background: #dce2eb; }
+.card-meta { border-color: #d4d9e1; }
+.event-details { border-color: #d4d9e1; }
+.hero-art-caption { text-transform: none; }
+.submit-link { padding-block: .55rem; }
+.eyebrow { font-size: .75rem; }
+.update-note { font-size: .78rem; color: #4e4d46; }
+.filter-button { font-size: .78rem; }
+.card-meta { font-size: .75rem; }
+.event-description { font-size: .9rem; }
+.event-details { font-size: .875rem; }
+.event-link { font-size: .875rem; }
+.site-footer { font-size: .8rem; color: #494941; }
+.wordmark { font-size: .85rem; }
+.submit-link { font-size: .9rem; }
+.loading-state, .empty-state { font-size: .9rem; color: #494941; }
+.calendar-footnote { font-size: .9rem; color: #494941; }
+.hero h1 em, .card-category { color: #b6251d; }
+.submit-link span, .text-link span, .calendar-footnote span, .site-footer a span { color: #b6251d; }
+.hero-art-index { font-size: .75rem; }
+@media (max-width: 600px) {
+  .wordmark { font-size: .8rem; }
+  .submit-link { font-size: .875rem; }
+}

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f7fa" />
+    <meta name="description" content="Exhibitions, talks, workshops, and happenings from the UNCG School of Art." />
+    <title>School of Art — What's On</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/accessibility.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#events">Skip to events</a>
+    <header class="site-header">
+      <a class="wordmark" href="/" aria-label="UNCG School of Art What's On home">
+        <span class="wordmark-seal" aria-hidden="true">A</span>
+        <span>UNC Greensboro <b>School of Art</b></span>
+      </a>
+      <a class="submit-link" id="submit-link" href="#submit">Submit an event <span aria-hidden="true">↗</span></a>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span> Greensboro, North Carolina <span class="eyebrow-divider">/</span> The School of Art calendar</p>
+          <h1 id="page-title">Make time<br />for <em>art.</em></h1>
+          <p class="hero-description">Exhibitions, conversations, workshops, and the things happening around our creative community.</p>
+          <a class="text-link" href="#events">Explore what's on <span aria-hidden="true">↓</span></a>
+        </div>
+        <div class="hero-art" aria-label="Abstract graphic with a bright red circle and cobalt blue square">
+          <div class="hero-art-grid" aria-hidden="true"></div>
+          <div class="hero-art-circle" aria-hidden="true"></div>
+          <div class="hero-art-square" aria-hidden="true"></div>
+          <span class="hero-art-caption">A calendar made<br />by our community.</span>
+          <span class="hero-art-index" aria-hidden="true">01—26</span>
+        </div>
+      </section>
+
+      <section class="events-section" id="events" aria-labelledby="events-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">The public calendar</p><h2 id="events-title">Coming up</h2></div>
+          <p class="update-note"><span aria-hidden="true">✳</span> Updated as events are approved</p>
+        </div>
+        <div class="filters" role="group" aria-label="Filter events by type">
+          <button class="filter-button is-active" data-filter="all" aria-pressed="true">All events</button>
+          <button class="filter-button" data-filter="Exhibition" aria-pressed="false">Exhibitions</button>
+          <button class="filter-button" data-filter="Talk" aria-pressed="false">Talks</button>
+          <button class="filter-button" data-filter="Workshop" aria-pressed="false">Workshops</button>
+          <button class="filter-button" data-filter="Other" aria-pressed="false">More</button>
+        </div>
+        <div class="event-grid" id="event-grid" aria-live="polite" aria-busy="true">
+          <p class="loading-state">Gathering what's happening…</p>
+        </div>
+        <p class="calendar-footnote">Have an event to share? <a id="footer-submit-link" href="#submit">Send it our way <span aria-hidden="true">↗</span></a></p>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>UNC Greensboro <b>School of Art</b></span>
+      <span>Made for the things we make together.</span>
+      <a href="https://art.uncg.edu/" target="_blank" rel="noreferrer">Visit the School of Art <span aria-hidden="true">↗</span></a>
+    </footer>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
