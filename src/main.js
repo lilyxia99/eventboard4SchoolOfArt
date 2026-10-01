@@ -38,7 +38,7 @@ filterButtons.forEach((button) => button.addEventListener('click', () => {
 }));
 
 async function start() {
-  const formUrl = safeURL(import.meta.env.VITE_TALLY_FORM_URL || '');
+  const formUrl = safeURL('https://tally.so/r/dWBvdK');
   if (formUrl) {
     document.querySelector('#submit-link').href = formUrl;
     document.querySelector('#footer-submit-link').href = formUrl;

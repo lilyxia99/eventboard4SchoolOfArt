@@ -4,7 +4,7 @@ A public events calendar. People submit events through Tally. A scheduled Codex 
 
 ## Site
 
-The Vite site reads `public/events.json`, shows upcoming events, and filters by category. The submission buttons use `VITE_TALLY_FORM_URL`, which must be the public URL of the published event form. Until that variable is set, the buttons remain disabled.
+The Vite site reads `public/events.json`, shows upcoming events, and filters by category. Its submission buttons open the published [UNCG School of Art event form](https://tally.so/r/dWBvdK).
 
 Run locally with Node.js 20 or newer:
 
@@ -29,12 +29,14 @@ Use these fields on the published form:
 | Event description | Long text, required |
 | Event link | URL, optional |
 | Poster | Image upload, optional |
+| Image description | Long text, optional when no poster is uploaded |
+| Contact email | Email, required; kept private for editorial follow-up |
 
 Tell submitters that approved event details and poster images will become public. Do not ask for sensitive personal information. Tally keeps submissions until Codex reviews them; no webhook or Netlify Blobs storage is used by this version.
 
 ## Daily Codex review
 
-For local Codex reviews, save the API key created in Tally account settings in macOS Keychain by running `bash scripts/store-tally-api-key.sh` and pasting it at the hidden prompt. Netlify masks secret values when they are read back, so a key saved only in Netlify cannot be used by the local scheduled task. Set `VITE_TALLY_FORM_URL` in Netlify to the published form URL. The review task needs the form ID shown by `scripts/fetch-tally-submissions.mjs forms` or in the Tally form URL.
+The form ID is `dWBvdK`. For local Codex reviews, keep `TALLY_API_KEY` in the ignored local `.env` file or save it in macOS Keychain with `bash scripts/store-tally-api-key.sh`. Netlify masks secret values when they are read back, so a key saved only in Netlify cannot be used by the local scheduled task. Never commit `.env`.
 
 The review script requests completed submissions from the [Tally API](https://developers.tally.so/api-reference/endpoint/forms/submissions/list), following every result page. It reads the API key from the process environment, macOS Keychain, or standard input, in that order. It does not save the key in the repository. It skips submission IDs already recorded in the ignored local `.codex-review-state.json` file.
 
