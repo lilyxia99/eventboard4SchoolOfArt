@@ -58,6 +58,18 @@
       </section>
     </main>
 
+    <dialog class="event-dialog" id="event-dialog" aria-labelledby="event-dialog-title">
+      <div class="event-dialog-shell">
+        <button class="dialog-close" type="button" data-close-dialog aria-label="Close event details">×</button>
+        <div id="event-dialog-content"></div>
+      </div>
+    </dialog>
+
+    <dialog class="image-dialog" id="image-dialog" aria-label="Full size event poster">
+      <button class="image-dialog-close" type="button" data-close-dialog aria-label="Close full size poster">×</button>
+      <div class="image-dialog-stage" id="image-dialog-stage"></div>
+    </dialog>
+
     <footer class="site-footer">
       <span>UNC Greensboro <b>School of Art</b></span>
       <span>Made for the things we make together.</span>
