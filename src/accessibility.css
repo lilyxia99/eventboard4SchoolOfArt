@@ -1,12 +1,13 @@
 /* Keep supporting labels readable while preserving the small editorial caps. */
-:root { --paper: #f5f7fa; --line: #cbd2dd; }
+:root { --paper: #f5f7fa; --line: #cbd2dd; background: #f5f7fa; }
+.hero-copy .eyebrow { text-transform: none; letter-spacing: .02em; }
 .events-section { background: #e9edf3; }
 .hero-art { background: #e3e9f2; }
 .section-heading { border-color: #c7d0dd; }
 .event-poster { background: #dce2eb; }
 .card-meta { border-color: #d4d9e1; }
 .event-details { border-color: #d4d9e1; }
-.hero-art-caption { text-transform: none; }
+.hero-art-caption { text-transform: none; letter-spacing: .02em; }
 .submit-link { padding-block: .55rem; }
 .eyebrow { font-size: .75rem; }
 .update-note { font-size: .78rem; color: #4e4d46; }

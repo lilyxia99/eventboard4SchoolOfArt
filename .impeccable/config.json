@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "index.html"
+        ],
+        "createdAt": "2026-10-01T13:07:47.746Z",
+        "reason": "Agent: hero-art text is positioned with percentage inset from the colored edge, so the wrapper needs no padding"
+      }
+    ]
+  }
+}
