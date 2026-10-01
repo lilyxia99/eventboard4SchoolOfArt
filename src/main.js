@@ -4,7 +4,12 @@ let allEvents = [];
 let activeFilter = 'all';
 
 const escapeHTML = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
-const safeURL = (value) => { try { const url = new URL(value); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } };
+const safeURL = (value) => { try { const url = new URL(value, window.location.origin); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } };
+const todayInGreensboro = () => {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const value = (type) => parts.find((part) => part.type === type).value;
+  return `${value('year')}-${value('month')}-${value('day')}`;
+};
 const formatDate = (value) => {
   const date = new Date(`${value}T12:00:00`);
   return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
@@ -20,13 +25,17 @@ function render() {
   grid.innerHTML = events.map((event, index) => {
     const poster = safeURL(event.posterUrl);
     const link = safeURL(event.eventUrl);
-    const date = formatDate(event.date);
+    const date = event.endDate ? `${formatDate(event.date)} – ${formatDate(event.endDate)}` : formatDate(event.date);
+    const additionalLinks = (Array.isArray(event.links) ? event.links : []).map(({ label, url }) => {
+      const href = safeURL(url);
+      return href ? `<a class="event-link" href="${escapeHTML(href)}" target="_blank" rel="noopener noreferrer">${escapeHTML(label || 'More information')} ↗</a>` : '';
+    }).join('');
     return `<article class="event-card" style="animation-delay:${Math.min(index * 70, 280)}ms">
-      <div class="event-poster">${poster ? `<img src="${escapeHTML(poster)}" alt="Poster for ${escapeHTML(event.title)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : `<div class="poster-fallback" aria-hidden="true" style="--poster:${index % 2 ? '#273eaa' : '#e1392f'}">${escapeHTML((event.category || 'Art').slice(0, 1))}</div>`}</div>
+      <div class="event-poster">${poster ? `<img src="${escapeHTML(poster)}" alt="${escapeHTML(event.posterAlt || `Poster for ${event.title}`)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : `<div class="poster-fallback" aria-hidden="true" style="--poster:${index % 2 ? '#273eaa' : '#e1392f'}">${escapeHTML((event.category || 'Art').slice(0, 1))}</div>`}</div>
       <div class="card-meta"><span class="card-category">${escapeHTML(event.category || 'Event')}</span><span>${escapeHTML(date)}</span></div>
       <h3>${escapeHTML(event.title)}</h3>
       <p class="event-description">${escapeHTML(event.description || '')}</p>
-      <div class="event-details"><span>${escapeHTML(event.time || '')}</span><span class="event-location">${escapeHTML(event.location || '')}</span>${link ? `<a class="event-link" href="${escapeHTML(link)}" target="_blank" rel="noopener noreferrer">More information ↗</a>` : ''}</div>
+      <div class="event-details"><span>${escapeHTML(event.time || '')}</span><span class="event-location">${escapeHTML(event.location || '')}</span>${link ? `<a class="event-link" href="${escapeHTML(link)}" target="_blank" rel="noopener noreferrer">More information ↗</a>` : ''}${additionalLinks}</div>
     </article>`;
   }).join('');
 }
@@ -54,9 +63,9 @@ async function start() {
     const response = await fetch('/events.json', { headers: { accept: 'application/json' } });
     if (!response.ok) throw new Error('Event feed unavailable');
     const body = await response.json();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInGreensboro();
     allEvents = Array.isArray(body.events)
-      ? body.events.filter((event) => event.date >= today).sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
+      ? body.events.filter((event) => (event.endDate || event.date) >= today).sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
       : [];
   } catch (error) {
     grid.innerHTML = '<p class="empty-state">The calendar could not load right now. Please try again in a little while.</p>';

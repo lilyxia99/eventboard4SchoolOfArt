@@ -1,3 +1,19 @@
 {
-  "events": []
+  "events": [
+    {
+      "title": "Listen to the Screen",
+      "category": "Other",
+      "date": "2026-10-01",
+      "endDate": "2026-10-10",
+      "time": "Oct 1, 7–9 p.m.; Oct 3, 4–6 p.m.; Oct 10, 11 a.m.–12:30 p.m. ET",
+      "location": "Gatewood Building 201 (Oct 1); online (Oct 3 and 10)",
+      "description": "A three-part series about making visual art accessible to blind and visually impaired audiences. Oct 1: “Telephone” screendance screening and filmmaker Q&A at 537 Highland Ave. Oct 3: online audio description for dance workshop with Krishna Washburn. Oct 10: online audio description for films, animation, and dance workshop with Dr. Joel Snyder. Join links are below; QR codes are on the poster. Questions: l_xia@uncg.edu.",
+      "links": [
+        { "label": "Join the Oct 3 Zoom workshop", "url": "https://us06web.zoom.us/j/81408516743?pwd=BaZuwq7MOXIlHNybiiXW5V8cmEgpJb.1" },
+        { "label": "Join the Oct 10 Teams workshop", "url": "https://teams.microsoft.com/meet/284843226989068?p=bV3o1TTeK0iOf52CCC" }
+      ],
+      "posterUrl": "/posters/listen-to-the-screen.png",
+      "posterAlt": "Listen to the Screen poster with bold black lettering, blue date panels, a filmstrip, a dancer, and a microphone. The three dates and event descriptions are also given in this listing."
+    }
+  ]
 }
