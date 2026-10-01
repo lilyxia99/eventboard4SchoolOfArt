@@ -31,7 +31,7 @@ function render() {
       return href ? `<a class="event-link" href="${escapeHTML(href)}" target="_blank" rel="noopener noreferrer">${escapeHTML(label || 'More information')} ↗</a>` : '';
     }).join('');
     return `<article class="event-card" style="animation-delay:${Math.min(index * 70, 280)}ms">
-      <div class="event-poster">${poster ? `<img src="${escapeHTML(poster)}" alt="${escapeHTML(event.posterAlt || `Poster for ${event.title}`)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : `<div class="poster-fallback" aria-hidden="true" style="--poster:${index % 2 ? '#273eaa' : '#e1392f'}">${escapeHTML((event.category || 'Art').slice(0, 1))}</div>`}</div>
+      <div class="event-poster${poster ? ' has-image' : ''}">${poster ? `<a class="poster-link" href="${escapeHTML(poster)}" target="_blank" rel="noopener noreferrer" aria-label="Open full poster for ${escapeHTML(event.title)}"><img src="${escapeHTML(poster)}" alt="${escapeHTML(event.posterAlt || `Poster for ${event.title}`)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()"></a>` : `<div class="poster-fallback" aria-hidden="true" style="--poster:${index % 2 ? '#273eaa' : '#e1392f'}">${escapeHTML((event.category || 'Art').slice(0, 1))}</div>`}</div>
       <div class="card-meta"><span class="card-category">${escapeHTML(event.category || 'Event')}</span><span>${escapeHTML(date)}</span></div>
       <h3>${escapeHTML(event.title)}</h3>
       <p class="event-description">${escapeHTML(event.description || '')}</p>
