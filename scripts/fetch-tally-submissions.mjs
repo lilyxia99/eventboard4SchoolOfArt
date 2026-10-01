@@ -1,14 +1,25 @@
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 
 const mode = process.argv[2] || 'forms';
 const formId = process.argv[3] || process.env.TALLY_FORM_ID;
 
 async function tokenFromInput() {
   if (process.env.TALLY_API_KEY) return process.env.TALLY_API_KEY.trim();
-  if (process.stdin.isTTY) throw new Error('Provide TALLY_API_KEY in the process environment or on standard input.');
+  try {
+    return execFileSync('security', ['find-generic-password', '-a', 'eventboard4SchoolOfArt', '-s', 'tally-api-key', '-w'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    // A key can also be supplied on standard input in noninteractive runs.
+  }
+  if (process.stdin.isTTY) throw new Error('Save the Tally API key in macOS Keychain or provide TALLY_API_KEY.');
   return new Promise((resolve, reject) => {
     process.stdin.once('data', (chunk) => resolve(String(chunk).trim()));
     process.stdin.once('error', reject);
+    process.stdin.once('end', () => reject(new Error('Save the Tally API key in macOS Keychain or provide TALLY_API_KEY.')));
+    process.stdin.resume();
   });
 }
 

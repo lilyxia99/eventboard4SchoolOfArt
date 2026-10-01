@@ -34,9 +34,9 @@ Tell submitters that approved event details and poster images will become public
 
 ## Daily Codex review
 
-Set `TALLY_API_KEY` as a secret in the Netlify project's environment variables. This is the API key created in Tally account settings. Set `VITE_TALLY_FORM_URL` to the published form URL. The review task needs the form ID shown by `scripts/fetch-tally-submissions.mjs forms` or in the Tally form URL.
+For local Codex reviews, save the API key created in Tally account settings in macOS Keychain by running `bash scripts/store-tally-api-key.sh` and pasting it at the hidden prompt. Netlify masks secret values when they are read back, so a key saved only in Netlify cannot be used by the local scheduled task. Set `VITE_TALLY_FORM_URL` in Netlify to the published form URL. The review task needs the form ID shown by `scripts/fetch-tally-submissions.mjs forms` or in the Tally form URL.
 
-The review script requests completed submissions from the [Tally API](https://developers.tally.so/api-reference/endpoint/forms/submissions/list), following every result page. It accepts the API key through `TALLY_API_KEY` at runtime or on standard input; it does not save the key. It skips submission IDs already recorded in the ignored local `.codex-review-state.json` file.
+The review script requests completed submissions from the [Tally API](https://developers.tally.so/api-reference/endpoint/forms/submissions/list), following every result page. It reads the API key from the process environment, macOS Keychain, or standard input, in that order. It does not save the key in the repository. It skips submission IDs already recorded in the ignored local `.codex-review-state.json` file.
 
 For each new submission, the scheduled Codex task checks required fields, future date, safe links and poster, relevance to visual art or the School of Art, and whether the event appears credible. It should leave doubtful entries unpublished and tell the owner why. For an approved entry, it adds only the public event fields to `public/events.json`, records the submission ID and decision in `.codex-review-state.json`, then commits and pushes the updated public file to `main`. The next Netlify deployment publishes it. The task uses Codex's scheduled run; this project does not call the OpenAI API.
 
