@@ -1,0 +1,71 @@
+import { readFileSync } from 'node:fs';
+
+const mode = process.argv[2] || 'forms';
+const formId = process.argv[3] || process.env.TALLY_FORM_ID;
+
+async function tokenFromInput() {
+  if (process.env.TALLY_API_KEY) return process.env.TALLY_API_KEY.trim();
+  if (process.stdin.isTTY) throw new Error('Provide TALLY_API_KEY in the process environment or on standard input.');
+  return new Promise((resolve, reject) => {
+    process.stdin.once('data', (chunk) => resolve(String(chunk).trim()));
+    process.stdin.once('error', reject);
+  });
+}
+
+function reviewedIds() {
+  try {
+    const state = JSON.parse(readFileSync('.codex-review-state.json', 'utf8'));
+    return new Set(Object.keys(state.reviewed || {}));
+  } catch (error) {
+    if (error.code === 'ENOENT') return new Set();
+    throw error;
+  }
+}
+
+const token = await tokenFromInput();
+if (!token) throw new Error('TALLY_API_KEY is empty.');
+
+async function tallyPage(path, page) {
+  const url = new URL(`https://api.tally.so${path}`);
+  url.searchParams.set('page', String(page));
+  url.searchParams.set('limit', '100');
+  if (mode === 'submissions') url.searchParams.set('filter', 'completed');
+  const response = await fetch(url, {
+    headers: { authorization: `Bearer ${token}`, 'tally-version': '2025-02-01' },
+  });
+  if (!response.ok) throw new Error(`Tally API request failed (${response.status}).`);
+  return response.json();
+}
+
+if (mode === 'forms') {
+  const forms = [];
+  for (let page = 1; ; page += 1) {
+    const result = await tallyPage('/forms', page);
+    forms.push(...(result.items || []).map(({ id, name, status, numberOfSubmissions }) => ({ id, name, status, numberOfSubmissions })));
+    if (!result.hasMore) break;
+  }
+  process.stdout.write(`${JSON.stringify({ forms }, null, 2)}\n`);
+} else if (mode === 'submissions') {
+  if (!formId) throw new Error('A Tally form ID is required.');
+  const seen = reviewedIds();
+  const submissions = [];
+  for (let page = 1; ; page += 1) {
+    const result = await tallyPage(`/forms/${encodeURIComponent(formId)}/submissions`, page);
+    const questions = new Map((result.questions || []).map((question) => [question.id, question.title || question.id]));
+    for (const submission of result.submissions || []) {
+      if (!submission.isCompleted || seen.has(submission.id)) continue;
+      submissions.push({
+        id: submission.id,
+        submittedAt: submission.submittedAt,
+        answers: (submission.responses || []).map((response) => ({
+          question: questions.get(response.questionId) || response.questionId,
+          answer: response.formattedAnswer ?? response.answer,
+        })),
+      });
+    }
+    if (!result.hasMore) break;
+  }
+  process.stdout.write(`${JSON.stringify({ formId, submissions }, null, 2)}\n`);
+} else {
+  throw new Error('Use forms or submissions as the first argument.');
+}

@@ -51,10 +51,13 @@ async function start() {
     });
   }
   try {
-    const response = await fetch('/api/events', { headers: { accept: 'application/json' } });
+    const response = await fetch('/events.json', { headers: { accept: 'application/json' } });
     if (!response.ok) throw new Error('Event feed unavailable');
     const body = await response.json();
-    allEvents = Array.isArray(body.events) ? body.events : [];
+    const today = new Date().toISOString().slice(0, 10);
+    allEvents = Array.isArray(body.events)
+      ? body.events.filter((event) => event.date >= today).sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
+      : [];
   } catch (error) {
     grid.innerHTML = '<p class="empty-state">The calendar could not load right now. Please try again in a little while.</p>';
   }
