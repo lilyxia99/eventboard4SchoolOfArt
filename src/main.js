@@ -4,7 +4,7 @@ let allEvents = [];
 let activeFilter = 'all';
 
 const escapeHTML = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
-const safeURL = (value) => { try { const url = new URL(value, window.location.origin); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } };
+const safeURL = (value) => { if (typeof value !== 'string' || !value.trim()) return ''; try { const url = new URL(value, window.location.origin); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } };
 const todayInGreensboro = () => {
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
   const value = (type) => parts.find((part) => part.type === type).value;
