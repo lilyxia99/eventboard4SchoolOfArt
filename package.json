@@ -9,5 +9,9 @@
   },
   "devDependencies": {
     "vite": "^7.0.0"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^11.1.2",
+    "@netlify/identity": "^2.0.0"
   }
 }

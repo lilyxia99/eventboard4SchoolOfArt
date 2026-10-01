@@ -47,6 +47,10 @@ filterButtons.forEach((button) => button.addEventListener('click', () => {
 }));
 
 async function start() {
+  if (window.location.hash.startsWith('#invite_token=')) {
+    window.location.replace(`/admin/${window.location.hash}`);
+    return;
+  }
   const formUrl = safeURL('https://tally.so/r/dWBvdK');
   if (formUrl) {
     document.querySelector('#submit-link').href = formUrl;
@@ -64,9 +68,14 @@ async function start() {
     if (!response.ok) throw new Error('Event feed unavailable');
     const body = await response.json();
     const today = todayInGreensboro();
-    allEvents = Array.isArray(body.events)
-      ? body.events.filter((event) => (event.endDate || event.date) >= today).sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`))
-      : [];
+    let manuallyApproved = [];
+    try {
+      const manualResponse = await fetch('/.netlify/functions/approved-events', { cache: 'no-store' });
+      if (manualResponse.ok) manuallyApproved = (await manualResponse.json()).events || [];
+    } catch { /* The Git-published calendar remains available when the review service is down. */ }
+    allEvents = [...(Array.isArray(body.events) ? body.events : []), ...manuallyApproved]
+      .filter((event) => (event.endDate || event.date) >= today)
+      .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
   } catch (error) {
     grid.innerHTML = '<p class="empty-state">The calendar could not load right now. Please try again in a little while.</p>';
   }

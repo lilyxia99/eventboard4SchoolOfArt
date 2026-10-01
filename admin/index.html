@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Review events — School of Art</title>
+    <link rel="stylesheet" href="../src/admin.css" />
+  </head>
+  <body>
+    <header class="topbar"><a href="/">← Public calendar</a><span>UNCG School of Art · Event review</span></header>
+    <main>
+      <div class="intro"><p class="eyebrow">PRIVATE REVIEW</p><h1>Event submissions</h1><p>Review entries from the Tally form. Only approved event details appear on the public calendar; contact addresses stay private.</p></div>
+      <p id="message" role="status" aria-live="polite"></p>
+      <section id="login-panel" hidden aria-labelledby="login-title">
+        <h2 id="login-title">Sign in</h2>
+        <form id="login-form"><label>Email<input name="email" type="email" autocomplete="username" required /></label><label>Password<input name="password" type="password" autocomplete="current-password" required /></label><button type="submit">Sign in</button></form>
+      </section>
+      <section id="invite-panel" hidden aria-labelledby="invite-title">
+        <h2 id="invite-title">Accept your invitation</h2>
+        <form id="invite-form"><label>Choose a password<input name="password" type="password" autocomplete="new-password" minlength="12" required /></label><button type="submit">Create account</button></form>
+      </section>
+      <section id="review-panel" hidden aria-labelledby="queue-title">
+        <div class="section-title"><div><p class="eyebrow" id="signed-in"></p><h2 id="queue-title">Review queue</h2></div><button type="button" id="sign-out" class="quiet">Sign out</button></div>
+        <div class="tabs" role="group" aria-label="Filter submissions"><button data-status="pending" class="selected" aria-pressed="true">Pending <span id="pending-count"></span></button><button data-status="approved" aria-pressed="false">Approved</button><button data-status="rejected" aria-pressed="false">Rejected</button></div>
+        <div id="submissions"></div>
+      </section>
+    </main>
+    <script type="module" src="../src/admin.js"></script>
+  </body>
+</html>

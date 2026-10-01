@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 const mode = process.argv[2] || 'forms';
 const formId = process.argv[3] || process.env.TALLY_FORM_ID;
@@ -33,6 +34,14 @@ function reviewedIds() {
   }
 }
 
+async function manuallyReviewedHashes() {
+  const response = await fetch('https://uncg-school-of-art-eventboard.netlify.app/.netlify/functions/reviewed-submissions');
+  if (!response.ok) throw new Error(`Could not check manual review decisions (${response.status}); publication paused.`);
+  const result = await response.json();
+  if (!Array.isArray(result.hashes)) throw new Error('Manual review response is invalid; publication paused.');
+  return new Set(result.hashes);
+}
+
 const token = await tokenFromInput();
 if (!token) throw new Error('TALLY_API_KEY is empty.');
 
@@ -59,12 +68,14 @@ if (mode === 'forms') {
 } else if (mode === 'submissions') {
   if (!formId) throw new Error('A Tally form ID is required.');
   const seen = reviewedIds();
+  const manuallyReviewed = await manuallyReviewedHashes();
   const submissions = [];
   for (let page = 1; ; page += 1) {
     const result = await tallyPage(`/forms/${encodeURIComponent(formId)}/submissions`, page);
     const questions = new Map((result.questions || []).map((question) => [question.id, question.title || question.id]));
     for (const submission of result.submissions || []) {
-      if (!submission.isCompleted || seen.has(submission.id)) continue;
+      const digest = createHash('sha256').update(submission.id).digest('hex');
+      if (!submission.isCompleted || seen.has(submission.id) || manuallyReviewed.has(digest)) continue;
       submissions.push({
         id: submission.id,
         submittedAt: submission.submittedAt,
