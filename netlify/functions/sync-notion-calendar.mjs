@@ -90,7 +90,7 @@ export async function syncCalendar() {
   const eligible = pages.filter((page) => ['In progress', 'Done'].includes(page.properties?.Select?.status?.name));
   const desired = new Map(eligible.map((page) => [page, googleEvent(page)]).filter(([, event]) => event).map(([page, event]) => [event.id, { page, event }]));
   const existing = await managedEvents(token);
-  const counts = { created: 0, updated: 0, removed: 0, published: 0, skippedUndated: eligible.length - desired.size };
+  const counts = { created: 0, updated: 0, removed: 0, published: 0, withoutCalendar: eligible.length - desired.size };
   for (const [id, { page, event }] of desired) {
     let saved;
     if (!existing.has(id)) {
@@ -125,13 +125,17 @@ export async function syncCalendar() {
     const id = `notion${page.id.replaceAll('-', '').toLowerCase()}`;
     if (desired.has(id)) continue;
     const oldId = (props['Google Event ID']?.rich_text || []).map((item) => item.plain_text || item.text?.content || '').join('');
-    if (oldId || props['Google Calendar']?.url || props['Eventboard page']?.url || props.Select?.status?.name === 'Done') {
+    const publishWithoutDate = ['In progress', 'Done'].includes(props.Select?.status?.name)
+      && toPublicEvent(page).title !== 'Untitled event';
+    const siteUrl = publishWithoutDate ? `${SITE}/#event-${page.id}` : null;
+    if (oldId || props['Google Calendar']?.url || (props['Eventboard page']?.url || null) !== siteUrl || (publishWithoutDate && props.Select?.status?.name !== 'Done')) {
       await updateNotionPage(page.id, {
-        ...(props.Select?.status?.name === 'Done' ? { Select: { status: { name: 'In progress' } } } : {}),
+        ...(publishWithoutDate && props.Select?.status?.name !== 'Done' ? { Select: { status: { name: 'Done' } } } : {}),
         'Google Event ID': { rich_text: [] },
         'Google Calendar': { url: null },
-        'Eventboard page': { url: null },
+        'Eventboard page': { url: siteUrl },
       });
+      if (publishWithoutDate && props.Select?.status?.name !== 'Done') counts.published += 1;
     }
   }
   return counts;

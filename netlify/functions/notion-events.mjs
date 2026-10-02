@@ -109,8 +109,8 @@ export default async (request) => {
   if (request.method !== 'GET') return json({ error: 'Method not allowed.' }, 405);
   try {
     const events = (await getDoneNotionPages())
-      .filter((page) => page.properties?.['Google Event ID']?.rich_text?.length && page.properties?.['Google Calendar']?.url)
-      .map(toPublicEvent);
+      .map(toPublicEvent)
+      .filter((event) => event.title !== 'Untitled event');
     return json({ events });
   } catch (error) {
     console.error('Notion event feed failed:', error instanceof Error ? error.message : 'Unknown error');
