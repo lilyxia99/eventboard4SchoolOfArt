@@ -32,7 +32,7 @@ Use these fields on the published form:
 | Image description | Long text, optional when no poster is uploaded |
 | Contact email | Email, required; kept private for editorial follow-up |
 
-This intake has been replaced by Notion. The old Tally review automation is paused.
+This intake has been replaced by Notion. The former Tally review automation now runs the Notion-to-Google sync.
 
 ## Private manual review
 
@@ -52,15 +52,15 @@ For deployment, add `NOTION_API_KEY` to the Netlify site's **Functions** environ
 
 `sync-notion-calendar` runs every 15 minutes on Netlify's published deploy. It reads rows with `In progress` or `Done` status. Dated rows with a title are created or updated on calendar `f9986b287c7b91dce74e53673364bfc7247a882a399a55b4a7027a752d5a6299@group.calendar.google.com`. The sync uses a stable Google event ID derived from the Notion page ID to avoid duplicates. After Google confirms the event, it fills `Google Event ID`, `Google Calendar`, and `Eventboard page`, then sets `Done`. Undated titled rows are also marked `Done` and receive an `Eventboard page` link, but no Google link or ID. Changing the status to `Not started` removes only events previously created by this sync and clears their links. Removing a date removes its calendar entry but leaves its `Done` website listing in place. The month view reads Google's public Events API through `calendar-events`.
 
-The existing `GOOGLE_CALENDAR_API` is an API key for reading the public calendar; place it in Netlify's Functions environment scope. It cannot authorize writes. To enable writes, create a Google Cloud service account in a project with the Google Calendar API enabled. Share **this calendar** with the service account email using the “Make changes to events” permission. Put the complete service account JSON in a Netlify environment variable named `GOOGLE_SERVICE_ACCOUNT_JSON`, scoped to Functions, and keep it out of the repository. The ignored local `.env` may contain the same variables for local operations. Do not commit either credential.
+The existing `GOOGLE_CALENDAR_API` is an API key for reading the public calendar; it is already configured on Netlify. It cannot authorize writes. The local Codex automation runs hourly using `node --env-file=.env scripts/run-notion-calendar-sync.mjs` and the service-account JSON in the ignored local `.env`; it needs this computer and Codex's local scheduler to be running. Share **this calendar** with the service account email using the “Make changes to events” permission. The Netlify scheduled function skips safely if `GOOGLE_SERVICE_ACCOUNT_JSON` is absent. Adding that variable to Netlify enables server-side sync; this site's current Netlify plan allows All scopes rather than a Functions-only scope. Do not commit either credential.
 
-## Legacy daily Codex review (paused)
+## Local Notion sync and legacy review
 
 The form ID is `dWBvdK`. For local Codex reviews, keep `TALLY_API_KEY` in the ignored local `.env` file or save it in macOS Keychain with `bash scripts/store-tally-api-key.sh`. Netlify masks secret values when they are read back, so a key saved only in Netlify cannot be used by the local scheduled task. Never commit `.env`.
 
 The review script requests completed submissions from the [Tally API](https://developers.tally.so/api-reference/endpoint/forms/submissions/list), following every result page. It reads the API key from the process environment, macOS Keychain, or standard input, in that order. It does not save the key in the repository. This workflow is paused and does not affect the Notion event feed.
 
-The former scheduled Codex task reviewed submissions and wrote approved public fields to `public/events.json`. That file is no longer the site's source of public events. The project does not call the OpenAI API.
+The active hourly Codex task now runs the local Notion-to-Google sync and stays quiet when no changes occur. The former task reviewed Tally submissions and wrote approved public fields to `public/events.json`. That file is no longer the site's source of public events. The project does not call the OpenAI API.
 
 An event entry has this shape:
 

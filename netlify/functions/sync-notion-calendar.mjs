@@ -147,6 +147,8 @@ export async function syncCalendar() {
 }
 
 export default async () => {
+  const configured = globalThis.Netlify?.env?.get('GOOGLE_SERVICE_ACCOUNT_JSON') || process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  if (!configured) return new Response(JSON.stringify({ skipped: 'Google Calendar write credentials are not configured on Netlify.' }), { headers: { 'Content-Type': 'application/json' } });
   try {
     const counts = await syncCalendar();
     console.log('Notion to Google Calendar sync:', counts);
