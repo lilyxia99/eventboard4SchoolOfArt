@@ -1,10 +1,12 @@
 # UNCG School of Art Eventboard
 
-A public events calendar. People submit events through Tally. The owner can review submissions at `/admin/`, and a scheduled Codex task can also review new submissions. The public site combines Git-published events with events approved in the review dashboard. Pending submissions and private contact addresses are never served by the public calendar.
+A public events calendar. People submit events through Tally. The owner can review submissions at `/admin/`, and a scheduled Codex task can also review new submissions. The public calendar displays only events from the connected Notion database whose `Status` property is set to `Done`.
+
+The public calendar also reads events from the connected Notion database when its `Status` property is set to `Done`. The Notion API key stays in the server-side Netlify Function and is never sent to the browser.
 
 ## Site
 
-The Vite site reads `public/events.json`, shows upcoming events, and filters by category. Its submission buttons open the published [UNCG School of Art event form](https://tally.so/r/dWBvdK).
+The site shows upcoming Notion events and filters by category. Its submission buttons open the published [UNCG School of Art event form](https://tally.so/r/dWBvdK).
 
 Run locally with Node.js 20 or newer:
 
@@ -41,6 +43,12 @@ The review page is at `https://uncg-school-of-art-eventboard.netlify.app/admin/`
 To activate login, enable Identity in the Netlify project dashboard, set registration to **Invite only**, and invite `l_xia@uncg.edu`. The invitation link opens the site and is forwarded to `/admin/` to set a password. Keep the site itself public. Identity is configured in the dashboard, not by the build.
 
 An approval saves only the editable public event fields to a site-wide Netlify Blobs store and makes the event available to the public calendar. Rejections save only the decision and timestamp. The private contact address remains in Tally. A public endpoint returns SHA-256 hashes of reviewed submission IDs so the local Codex task skips entries already handled in the dashboard without exposing their content. A decision cannot be changed from the dashboard after it is saved; contact the project maintainer if a correction is required.
+
+## Notion event feed
+
+The public calendar reads the Notion database at `3ed401da165b80cb8216d9afa845ef79` through `/.netlify/functions/notion-events`. The function discovers the database's data source and queries only pages whose `Status` property equals `Done`. It supports a Notion `Status` property or a select property named `Status`/`状态`. Event columns are matched by common English/Chinese names and Notion property types: title, date, time, category, location, description, event link, poster, and image description.
+
+For deployment, add `NOTION_API_KEY` to the Netlify site's **Functions** environment scope and share this database with the Notion integration that owns the token. The ignored local `.env` supports local scripts; Netlify does not receive local `.env` values automatically. If the Notion API is unavailable, the page shows a temporary-unavailable message and does not fall back to other event sources. Older entries in `public/events.json` or the manual review queue do not appear in this calendar unless they are also added to Notion with `Status` set to `Done`.
 
 ## Daily Codex review
 

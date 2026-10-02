@@ -114,20 +114,15 @@ async function start() {
     });
   }
   try {
-    const response = await fetch('/events.json', { headers: { accept: 'application/json' } });
-    if (!response.ok) throw new Error('Event feed unavailable');
+    const response = await fetch('/.netlify/functions/notion-events', { cache: 'no-store', headers: { accept: 'application/json' } });
+    if (!response.ok) throw new Error('Notion event feed unavailable');
     const body = await response.json();
     const today = todayInGreensboro();
-    let manuallyApproved = [];
-    try {
-      const manualResponse = await fetch('/.netlify/functions/approved-events', { cache: 'no-store' });
-      if (manualResponse.ok) manuallyApproved = (await manualResponse.json()).events || [];
-    } catch { /* The Git-published calendar remains available when the review service is down. */ }
-    allEvents = [...(Array.isArray(body.events) ? body.events : []), ...manuallyApproved]
+    allEvents = (Array.isArray(body.events) ? body.events : [])
       .filter((event) => (event.endDate || event.date) >= today)
       .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
   } catch (error) {
-    grid.innerHTML = '<p class="empty-state">The calendar could not load right now. Please try again in a little while.</p>';
+    grid.innerHTML = '<p class="empty-state">The event list is temporarily unavailable. Please try again in a little while.</p>';
   }
   grid.setAttribute('aria-busy', 'false');
   render();
