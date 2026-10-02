@@ -83,7 +83,8 @@ function downloadICS(event) {
     endValue = date.toISOString().slice(0, 10);
   }
   const end = allDay ? `DTEND;VALUE=DATE:${icsDate(endValue.slice(0, 10))}` : `DTEND:${icsUTC(endValue)}`;
-  const body = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//UNCG School of Art Eventboard//EN', 'BEGIN:VEVENT', `UID:${icsEscape(event.id || crypto.randomUUID())}@eventboard.uncg.edu`, `DTSTAMP:${icsUTC(new Date().toISOString())}`, start, end, `SUMMARY:${icsEscape(event.title)}`, `DESCRIPTION:${icsEscape(event.description)}`, `LOCATION:${icsEscape(event.location)}`, 'END:VEVENT', 'END:VCALENDAR', ''].join('\r\n');
+  const eventLink = safeURL(event.eventUrl) || safeURL(event.calendarUrl);
+  const body = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//UNCG School of Art Eventboard//EN', 'BEGIN:VEVENT', `UID:${icsEscape(event.id || crypto.randomUUID())}@eventboard.uncg.edu`, `DTSTAMP:${icsUTC(new Date().toISOString())}`, start, end, `SUMMARY:${icsEscape(event.title)}`, `DESCRIPTION:${icsEscape(event.description)}`, `LOCATION:${icsEscape(event.location)}`, ...(eventLink ? [`URL:${eventLink}`] : []), 'END:VEVENT', 'END:VCALENDAR', ''].join('\r\n');
   const url = URL.createObjectURL(new Blob([body], { type: 'text/calendar;charset=utf-8' }));
   const link = document.createElement('a');
   link.href = url;
