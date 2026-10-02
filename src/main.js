@@ -260,7 +260,7 @@ async function start() {
   await refreshEvents();
   const linkedId = location.hash.match(/^#event-([0-9a-f-]{36})$/i)?.[1];
   if (linkedId) openEvent(allEvents.find((event) => event.id === linkedId));
-  setInterval(() => { if (!document.hidden) refreshEvents(); }, 15000);
+  setInterval(() => { if (!document.hidden) refreshEvents(); }, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshEvents(); });
 }
 

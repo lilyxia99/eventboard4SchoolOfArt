@@ -4,7 +4,7 @@ A public events calendar. People submit events through the [Notion form](https:/
 
 ## Site
 
-The site shows `Done` Notion events and filters by category. Undated events display “Date to be announced.” Its submission buttons open the Notion form. Both event cards and the month view read Notion directly. The open page checks for changes every 15 seconds and refreshes when brought back into view; a new page load reads current Notion data. Selecting a dated event opens details and an individual `.ics` download. Calendar and Eventboard links appear when available. Every public Notion event has a shareable detail URL of the form `/#event-<Notion page ID>`.
+The site shows `Done` Notion events and filters by category. Undated events display “Date to be announced.” Its submission buttons open the Notion form. Both event cards and the month view read Notion directly. The open page checks for changes every 60 seconds and refreshes when brought back into view; a new page load reads current Notion data. Selecting a dated event opens details and an individual `.ics` download. Calendar and Eventboard links appear when available. Every public Notion event has a shareable detail URL of the form `/#event-<Notion page ID>`.
 
 Run locally with Node.js 20 or newer:
 
