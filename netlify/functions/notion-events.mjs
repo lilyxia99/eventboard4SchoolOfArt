@@ -42,19 +42,20 @@ function safeHttps(value) {
   }
 }
 
-function toPublicEvent(page) {
+export function toPublicEvent(page) {
   const properties = page.properties || {};
   const title = richText(properties['Name of the event']?.title) || 'Untitled event';
   const date = properties.Date?.date;
   const types = properties.Type?.multi_select?.map((option) => option.name) || [];
   const category = types.find((type) => ['Exhibition', 'Talk', 'Workshop', 'Other'].includes(type)) || 'Other';
   const description = richText(properties['Description by yourself (if you don’t use AI put it here)']?.rich_text)
+    || richText(properties['AI description']?.rich_text)
     || richText(properties['Description for AI  (optional)']?.rich_text);
   const location = richText(properties['Location ']?.rich_text)
     || properties['Location (1)']?.place?.name
     || properties['Location (1)']?.place?.address
     || '';
-  const event = { title, category, date: date?.start?.slice(0, 10) || '', time: '', location, description };
+  const event = { title, category, date: date?.start?.slice(0, 10) || '', start: date?.start || '', end: date?.end || '', time: '', location, description };
   if (date?.end) event.endDate = date.end.slice(0, 10);
   if (date?.start?.includes('T')) {
     const start = new Date(date.start);
@@ -74,31 +75,32 @@ function toPublicEvent(page) {
   return event;
 }
 
+export async function getDoneNotionPages() {
+  const token = notionToken();
+  if (!token) throw new Error('NOTION_API_KEY is unavailable to the function.');
+  const pages = [];
+  let startCursor;
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    const result = await notionRequest(`data_sources/${DATA_SOURCE_ID}/query`, token, {
+      page_size: 100,
+      filter: { property: 'Select', status: { equals: 'Done' } },
+      ...(startCursor ? { start_cursor: startCursor } : {}),
+    });
+    for (const row of result.results || []) {
+      if (row.properties?.Select?.status?.name === 'Done') pages.push(row);
+    }
+    if (!result.has_more) return pages;
+    if (!result.next_cursor) throw new Error('Notion pagination cursor is missing.');
+    startCursor = result.next_cursor;
+  }
+  throw new Error('The Notion event list is too large to load safely.');
+}
+
 export default async (request) => {
   if (request.method !== 'GET') return json({ error: 'Method not allowed.' }, 405);
-  const token = notionToken();
-  if (!token) {
-    console.error('Notion event feed failed: NOTION_API_KEY is unavailable to the function.');
-    return json({ error: 'The Notion event feed is temporarily unavailable.' }, 503);
-  }
-
   try {
-    const events = [];
-    let startCursor;
-    for (let page = 0; page < MAX_PAGES; page += 1) {
-      const result = await notionRequest(`data_sources/${DATA_SOURCE_ID}/query`, token, {
-        page_size: 100,
-        filter: { property: 'Select', status: { equals: 'Done' } },
-        ...(startCursor ? { start_cursor: startCursor } : {}),
-      });
-      for (const row of result.results || []) {
-        if (row.properties?.Select?.status?.name === 'Done') events.push(toPublicEvent(row));
-      }
-      if (!result.has_more) return json({ events });
-      if (!result.next_cursor) throw new Error('Notion pagination cursor is missing.');
-      startCursor = result.next_cursor;
-    }
-    throw new Error('The Notion event list is too large to load safely.');
+    const events = (await getDoneNotionPages()).map(toPublicEvent);
+    return json({ events });
   } catch (error) {
     console.error('Notion event feed failed:', error instanceof Error ? error.message : 'Unknown error');
     return json({ error: 'The Notion event feed is temporarily unavailable.' }, 503);

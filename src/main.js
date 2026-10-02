@@ -3,6 +3,12 @@ const filterButtons = [...document.querySelectorAll('.filter-button')];
 let allEvents = [];
 let visibleEvents = [];
 let activeFilter = 'all';
+let calendarEvents = [];
+let selectedMonth = new Date();
+selectedMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
+const monthCalendar = document.querySelector('#month-calendar');
+const monthTitle = document.querySelector('#month-title');
+const monthNote = document.querySelector('#month-note');
 const eventDialog = document.querySelector('#event-dialog');
 const eventDialogContent = document.querySelector('#event-dialog-content');
 const imageDialog = document.querySelector('#image-dialog');
@@ -15,6 +21,76 @@ const formatDate = (value) => {
   const date = new Date(`${value}T12:00:00`);
   return Number.isNaN(date.getTime()) ? 'Date to be announced' : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
 };
+const localDay = (value) => {
+  if (!value) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(value));
+  const part = (type) => parts.find((item) => item.type === type)?.value;
+  return `${part('year')}-${part('month')}-${part('day')}`;
+};
+const calendarTime = (event) => event.allDay ? 'All day' : new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }).format(new Date(event.start));
+const eventWhen = (event) => {
+  if (!event.start) return event.time || formatDate(event.date);
+  if (event.allDay || !event.start.includes('T')) return `${formatDate(localDay(event.start))}${event.endDate ? ` – ${formatDate(event.endDate)}` : ''} · All day`;
+  const start = new Date(event.start);
+  const end = event.end ? new Date(event.end) : null;
+  const date = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'long', day: 'numeric', year: 'numeric' }).format(start);
+  const time = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }).format(start);
+  const endTime = end && !Number.isNaN(end.getTime()) ? new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }).format(end) : '';
+  return `${date} · ${time}${endTime ? `–${endTime}` : ''} ET`;
+};
+
+function renderMonth() {
+  monthTitle.textContent = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(selectedMonth);
+  const first = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
+  const gridStart = new Date(first);
+  gridStart.setDate(1 - first.getDay());
+  const last = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
+  const cells = Math.ceil((first.getDay() + last.getDate()) / 7) * 7;
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => `<div class="month-weekday">${day}</div>`).join('');
+  const days = Array.from({ length: cells }, (_, offset) => {
+    const day = new Date(gridStart);
+    day.setDate(gridStart.getDate() + offset);
+    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+    const matches = calendarEvents.map((event, index) => ({ event, index })).filter(({ event }) => {
+      const start = localDay(event.start);
+      const end = event.allDay ? localDay(event.end) : localDay(new Date(new Date(event.end).getTime() - 1).toISOString());
+      return key >= start && key <= (event.allDay ? localDay(new Date(new Date(`${end}T12:00:00Z`).getTime() - 86400000).toISOString()) : end);
+    });
+    const buttons = matches.map(({ event, index }) => `<button type="button" class="month-event" data-calendar-index="${index}" aria-label="${escapeHTML(event.title)}, ${escapeHTML(eventWhen(event))}"><span class="month-event-time">${escapeHTML(calendarTime(event))}</span> ${escapeHTML(event.title)}</button>`).join('');
+    return `<div class="month-day${day.getMonth() === selectedMonth.getMonth() ? '' : ' is-outside'}${key === localDay(new Date().toISOString()) ? ' is-today' : ''}"><span class="month-day-number">${day.getDate()}</span>${buttons}</div>`;
+  }).join('');
+  monthCalendar.innerHTML = weekdays + days;
+}
+
+const icsEscape = (value) => String(value || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
+const icsDate = (value) => value.replaceAll('-', '');
+const icsUTC = (value) => new Date(value).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+function downloadICS(event) {
+  if (!event.start) return;
+  const allDay = event.allDay || !event.start.includes('T');
+  const start = allDay ? `DTSTART;VALUE=DATE:${icsDate(event.start.slice(0, 10))}` : `DTSTART:${icsUTC(event.start)}`;
+  let endValue = event.end;
+  if (!endValue && allDay) {
+    const date = new Date(`${event.start.slice(0, 10)}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + 1);
+    endValue = date.toISOString().slice(0, 10);
+  }
+  if (!endValue && !allDay) endValue = new Date(new Date(event.start).getTime() + 3600000).toISOString();
+  if (allDay && !event.allDay && event.end) {
+    const date = new Date(`${event.end.slice(0, 10)}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + 1);
+    endValue = date.toISOString().slice(0, 10);
+  }
+  const end = allDay ? `DTEND;VALUE=DATE:${icsDate(endValue.slice(0, 10))}` : `DTEND:${icsUTC(endValue)}`;
+  const body = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//UNCG School of Art Eventboard//EN', 'BEGIN:VEVENT', `UID:${icsEscape(event.id || crypto.randomUUID())}@eventboard.uncg.edu`, `DTSTAMP:${icsUTC(new Date().toISOString())}`, start, end, `SUMMARY:${icsEscape(event.title)}`, `DESCRIPTION:${icsEscape(event.description)}`, `LOCATION:${icsEscape(event.location)}`, 'END:VEVENT', 'END:VCALENDAR', ''].join('\r\n');
+  const url = URL.createObjectURL(new Blob([body], { type: 'text/calendar;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${(event.title || 'event').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'event'}.ics`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 function render() {
   const events = allEvents.filter((event) => activeFilter === 'all' || event.category === activeFilter);
@@ -50,16 +126,18 @@ function relatedLinks(event) {
 function openEvent(event) {
   if (!event) return;
   const poster = safeURL(event.posterUrl);
-  const date = event.endDate ? `${formatDate(event.date)} – ${formatDate(event.endDate)}` : formatDate(event.date);
+  const date = eventWhen(event);
   eventDialogContent.innerHTML = `<div class="event-dialog-layout${poster ? ' has-poster' : ''}">
     ${poster ? `<button class="event-dialog-poster" type="button" aria-label="Enlarge poster for ${escapeHTML(event.title)}"><img src="${escapeHTML(poster)}" alt="${escapeHTML(event.posterAlt || `Poster for ${event.title}`)}"></button>` : ''}
     <div class="event-dialog-copy"><p class="event-dialog-category">${escapeHTML(event.category || 'Event')} · ${escapeHTML(date)}</p>
       <h2 id="event-dialog-title">${escapeHTML(event.title)}</h2>
-      <dl class="event-dialog-facts"><div><dt>When</dt><dd>${escapeHTML(event.time || date)}</dd></div><div><dt>Where</dt><dd>${escapeHTML(event.location || 'See event details')}</dd></div></dl>
+      <dl class="event-dialog-facts"><div><dt>When</dt><dd>${escapeHTML(date)}</dd></div><div><dt>Where</dt><dd>${escapeHTML(event.location || 'See event details')}</dd></div></dl>
       <p class="event-dialog-description">${escapeHTML(event.description || '')}</p>${relatedLinks(event)}
+      <button class="download-ics" type="button" ${event.start ? '' : 'disabled title="Add a date in Notion to enable download"'}>Download .ics</button>
     </div>
   </div>`;
   if (poster) eventDialogContent.querySelector('.event-dialog-poster').addEventListener('click', () => openImage(event));
+  eventDialogContent.querySelector('.download-ics').addEventListener('click', () => downloadICS(event));
   eventDialog.showModal();
 }
 
@@ -85,6 +163,13 @@ for (const dialog of [eventDialog, imageDialog]) {
   dialog.querySelector('[data-close-dialog]').addEventListener('click', () => dialog.close());
 }
 imageDialog.addEventListener('close', () => imageDialogStage.replaceChildren());
+monthCalendar.addEventListener('click', (click) => {
+  const button = click.target.closest('[data-calendar-index]');
+  if (button) openEvent(calendarEvents[Number(button.dataset.calendarIndex)]);
+});
+document.querySelector('#month-prev').addEventListener('click', () => { selectedMonth.setMonth(selectedMonth.getMonth() - 1); renderMonth(); });
+document.querySelector('#month-next').addEventListener('click', () => { selectedMonth.setMonth(selectedMonth.getMonth() + 1); renderMonth(); });
+document.querySelector('#month-today').addEventListener('click', () => { selectedMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); renderMonth(); });
 
 filterButtons.forEach((button) => button.addEventListener('click', () => {
   activeFilter = button.dataset.filter;
@@ -97,7 +182,7 @@ async function start() {
     window.location.replace(`/admin/${window.location.hash}`);
     return;
   }
-  const formUrl = safeURL('https://tally.so/r/dWBvdK');
+  const formUrl = safeURL('https://leileixia.notion.site/3ed401da165b80cb8216d9afa845ef79?pvs=105');
   if (formUrl) {
     document.querySelector('#submit-link').href = formUrl;
     document.querySelector('#footer-submit-link').href = formUrl;
@@ -109,6 +194,17 @@ async function start() {
       link.addEventListener('click', (event) => event.preventDefault());
     });
   }
+  renderMonth();
+  fetch('/.netlify/functions/calendar-events', { cache: 'no-store' })
+    .then(async (response) => {
+      if (!response.ok) throw new Error('Calendar feed unavailable');
+      const body = await response.json();
+      calendarEvents = Array.isArray(body.events) ? body.events : [];
+      renderMonth();
+      monthNote.textContent = calendarEvents.length ? 'Times shown in Eastern Time.' : 'No events are scheduled on this Google Calendar yet.';
+      monthCalendar.setAttribute('aria-busy', 'false');
+    })
+    .catch(() => { monthNote.textContent = 'The Google Calendar is temporarily unavailable.'; monthCalendar.setAttribute('aria-busy', 'false'); });
   try {
     const response = await fetch('/.netlify/functions/notion-events', { cache: 'no-store', headers: { accept: 'application/json' } });
     if (!response.ok) throw new Error('Notion event feed unavailable');

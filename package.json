@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@netlify/blobs": "^11.1.2",
-    "@netlify/identity": "^2.0.0"
+    "@netlify/identity": "^2.0.0",
+    "ical.js": "^2.2.1"
   }
 }
