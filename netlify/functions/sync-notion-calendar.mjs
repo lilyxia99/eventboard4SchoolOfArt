@@ -1,9 +1,10 @@
 import { createSign } from 'node:crypto';
-import { getDoneNotionPages, toPublicEvent } from './notion-events.mjs';
+import { getSyncNotionPages, toPublicEvent, updateNotionPage } from './notion-events.mjs';
 
 const CALENDAR_ID = 'f9986b287c7b91dce74e53673364bfc7247a882a399a55b4a7027a752d5a6299@group.calendar.google.com';
 const API = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events`;
 const SOURCE = 'uncg-school-of-art-eventboard';
+const SITE = 'https://uncg-school-of-art-eventboard.netlify.app';
 const base64url = (value) => Buffer.from(value).toString('base64url');
 
 function exclusiveEnd(date) {
@@ -45,7 +46,7 @@ async function googleRequest(url, token, method = 'GET', body) {
 
 function googleEvent(page) {
   const event = toPublicEvent(page);
-  if (!event.start) return null;
+  if (!event.start || event.title === 'Untitled event') return null;
   const id = `notion${page.id.replaceAll('-', '').toLowerCase()}`;
   const allDay = !event.start.includes('T');
   const start = allDay ? { date: event.date } : { dateTime: event.start, timeZone: 'America/New_York' };
@@ -57,8 +58,11 @@ function googleEvent(page) {
     if (Number.isNaN(startTime.getTime())) return null;
     end = { dateTime: new Date(startTime.getTime() + 60 * 60 * 1000).toISOString(), timeZone: 'America/New_York' };
   }
-  const description = [event.description, event.eventUrl].filter(Boolean).join('\n\n');
-  return { id, summary: event.title, description, location: event.location, start, end, extendedProperties: { private: { source: SOURCE } } };
+  const unique = page.properties?.ID?.unique_id;
+  const reference = unique?.number ? `Notion ID: ${unique.prefix || ''}${unique.number}` : '';
+  const siteUrl = `${SITE}/#event-${page.id}`;
+  const description = [event.description, event.eventUrl, reference, `View on Eventboard: ${siteUrl}`].filter(Boolean).join('\n\n');
+  return { id, summary: event.title, description, location: event.location, start, end, extendedProperties: { private: { source: SOURCE, notionPageId: page.id } } };
 }
 
 async function managedEvents(token) {
@@ -77,27 +81,57 @@ async function managedEvents(token) {
 }
 
 function comparable(event) {
-  return JSON.stringify([event.summary || '', event.description || '', event.location || '', event.start, event.end]);
+  const date = (value) => value?.date || (value?.dateTime ? new Date(value.dateTime).toISOString() : '');
+  return JSON.stringify([event.summary || '', event.description || '', event.location || '', date(event.start), date(event.end)]);
 }
 
 export async function syncCalendar() {
-  const [pages, token] = await Promise.all([getDoneNotionPages(), accessToken()]);
-  const desired = new Map(pages.map(googleEvent).filter(Boolean).map((event) => [event.id, event]));
+  const [pages, token] = await Promise.all([getSyncNotionPages(), accessToken()]);
+  const eligible = pages.filter((page) => ['In progress', 'Done'].includes(page.properties?.Select?.status?.name));
+  const desired = new Map(eligible.map((page) => [page, googleEvent(page)]).filter(([, event]) => event).map(([page, event]) => [event.id, { page, event }]));
   const existing = await managedEvents(token);
-  const counts = { created: 0, updated: 0, removed: 0, skippedUndated: pages.length - desired.size };
-  for (const [id, event] of desired) {
+  const counts = { created: 0, updated: 0, removed: 0, published: 0, skippedUndated: eligible.length - desired.size };
+  for (const [id, { page, event }] of desired) {
+    let saved;
     if (!existing.has(id)) {
-      await googleRequest(API, token, 'POST', event);
+      saved = await googleRequest(API, token, 'POST', event);
       counts.created += 1;
     } else if (comparable(existing.get(id)) !== comparable(event)) {
-      await googleRequest(`${API}/${id}`, token, 'PUT', event);
+      saved = await googleRequest(`${API}/${id}`, token, 'PUT', event);
       counts.updated += 1;
+    } else saved = existing.get(id);
+    if (!saved?.htmlLink) throw new Error('Google Calendar did not return an event link.');
+    const siteUrl = `${SITE}/#event-${page.id}`;
+    const props = page.properties || {};
+    const currentId = (props['Google Event ID']?.rich_text || []).map((item) => item.plain_text || item.text?.content || '').join('');
+    if (props.Select?.status?.name !== 'Done' || props['Google Calendar']?.url !== saved.htmlLink || props['Eventboard page']?.url !== siteUrl || currentId !== id) {
+      await updateNotionPage(page.id, {
+        Select: { status: { name: 'Done' } },
+        'Google Event ID': { rich_text: [{ text: { content: id } }] },
+        'Google Calendar': { url: saved.htmlLink },
+        'Eventboard page': { url: siteUrl },
+      });
+      counts.published += 1;
     }
   }
   for (const id of existing.keys()) {
     if (!desired.has(id)) {
       await googleRequest(`${API}/${id}`, token, 'DELETE');
       counts.removed += 1;
+    }
+  }
+  for (const page of pages) {
+    const props = page.properties || {};
+    const id = `notion${page.id.replaceAll('-', '').toLowerCase()}`;
+    if (desired.has(id)) continue;
+    const oldId = (props['Google Event ID']?.rich_text || []).map((item) => item.plain_text || item.text?.content || '').join('');
+    if (oldId || props['Google Calendar']?.url || props['Eventboard page']?.url || props.Select?.status?.name === 'Done') {
+      await updateNotionPage(page.id, {
+        ...(props.Select?.status?.name === 'Done' ? { Select: { status: { name: 'In progress' } } } : {}),
+        'Google Event ID': { rich_text: [] },
+        'Google Calendar': { url: null },
+        'Eventboard page': { url: null },
+      });
     }
   }
   return counts;

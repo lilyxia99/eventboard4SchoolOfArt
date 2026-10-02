@@ -14,9 +14,9 @@ function notionToken() {
     || (typeof process !== 'undefined' ? process.env.NOTION_API_KEY : '');
 }
 
-async function notionRequest(path, token, body) {
+async function notionRequest(path, token, body, method = 'POST') {
   const response = await fetch(`https://api.notion.com/v1/${path}`, {
-    method: 'POST',
+    method,
     headers: {
       Authorization: `Bearer ${token}`,
       'Notion-Version': NOTION_VERSION,
@@ -55,7 +55,7 @@ export function toPublicEvent(page) {
     || properties['Location (1)']?.place?.name
     || properties['Location (1)']?.place?.address
     || '';
-  const event = { title, category, date: date?.start?.slice(0, 10) || '', start: date?.start || '', end: date?.end || '', time: '', location, description };
+  const event = { id: page.id, title, category, date: date?.start?.slice(0, 10) || '', start: date?.start || '', end: date?.end || '', time: '', location, description };
   if (date?.end) event.endDate = date.end.slice(0, 10);
   if (date?.start?.includes('T')) {
     const start = new Date(date.start);
@@ -68,6 +68,8 @@ export function toPublicEvent(page) {
   const poster = properties['Poster (highly recommend)']?.files?.[0];
   const posterUrl = safeHttps(poster?.file?.url || poster?.external?.url);
   if (eventUrl) event.eventUrl = eventUrl;
+  const calendarUrl = safeHttps(properties['Google Calendar']?.url);
+  if (calendarUrl) event.calendarUrl = calendarUrl;
   if (posterUrl) {
     event.posterUrl = posterUrl;
     event.posterAlt = `Poster for ${title}; event details are listed on this page.`;
@@ -75,7 +77,7 @@ export function toPublicEvent(page) {
   return event;
 }
 
-export async function getDoneNotionPages() {
+async function queryNotionPages(filter) {
   const token = notionToken();
   if (!token) throw new Error('NOTION_API_KEY is unavailable to the function.');
   const pages = [];
@@ -83,12 +85,10 @@ export async function getDoneNotionPages() {
   for (let page = 0; page < MAX_PAGES; page += 1) {
     const result = await notionRequest(`data_sources/${DATA_SOURCE_ID}/query`, token, {
       page_size: 100,
-      filter: { property: 'Select', status: { equals: 'Done' } },
+      ...(filter ? { filter } : {}),
       ...(startCursor ? { start_cursor: startCursor } : {}),
     });
-    for (const row of result.results || []) {
-      if (row.properties?.Select?.status?.name === 'Done') pages.push(row);
-    }
+    pages.push(...(result.results || []));
     if (!result.has_more) return pages;
     if (!result.next_cursor) throw new Error('Notion pagination cursor is missing.');
     startCursor = result.next_cursor;
@@ -96,10 +96,21 @@ export async function getDoneNotionPages() {
   throw new Error('The Notion event list is too large to load safely.');
 }
 
+export const getDoneNotionPages = () => queryNotionPages({ property: 'Select', status: { equals: 'Done' } });
+export const getSyncNotionPages = () => queryNotionPages();
+
+export async function updateNotionPage(id, properties) {
+  const token = notionToken();
+  if (!token) throw new Error('NOTION_API_KEY is unavailable to the function.');
+  return notionRequest(`pages/${id}`, token, { properties }, 'PATCH');
+}
+
 export default async (request) => {
   if (request.method !== 'GET') return json({ error: 'Method not allowed.' }, 405);
   try {
-    const events = (await getDoneNotionPages()).map(toPublicEvent);
+    const events = (await getDoneNotionPages())
+      .filter((page) => page.properties?.['Google Event ID']?.rich_text?.length && page.properties?.['Google Calendar']?.url)
+      .map(toPublicEvent);
     return json({ events });
   } catch (error) {
     console.error('Notion event feed failed:', error instanceof Error ? error.message : 'Unknown error');

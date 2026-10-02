@@ -1,62 +1,42 @@
-import ICAL from 'ical.js';
-
-const ICS_URL = 'https://calendar.google.com/calendar/ical/f9986b287c7b91dce74e53673364bfc7247a882a399a55b4a7027a752d5a6299%40group.calendar.google.com/public/basic.ics';
-const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=300, s-maxage=300' };
-
-export function parseCalendar(source) {
-  const calendar = new ICAL.Component(ICAL.parse(source));
-  for (const timezone of calendar.getAllSubcomponents('vtimezone')) ICAL.TimezoneService.register(timezone);
-  const components = calendar.getAllSubcomponents('vevent');
-  const exceptions = new Map();
-  for (const component of components) {
-    if (!component.hasProperty('recurrence-id')) continue;
-    const uid = component.getFirstPropertyValue('uid');
-    if (!exceptions.has(uid)) exceptions.set(uid, []);
-    exceptions.get(uid).push(component);
-  }
-  const lower = Date.now() - 366 * 86400000;
-  const upper = Date.now() + 730 * 86400000;
-  const events = [];
-  for (const component of components) {
-    if (component.hasProperty('recurrence-id')) continue;
-    const item = new ICAL.Event(component);
-    for (const exception of exceptions.get(item.uid) || []) item.relateException(new ICAL.Event(exception));
-    const add = (details) => {
-      const start = details.startDate.toJSDate();
-      const end = details.endDate.toJSDate();
-      if (end.getTime() < lower || start.getTime() > upper) return;
-      const actual = details.item;
-      events.push({
-        id: `${item.uid}:${details.recurrenceId.toString()}`,
-        title: actual.summary || 'Untitled event',
-        description: actual.description || '',
-        location: actual.location || '',
-        allDay: details.startDate.isDate,
-        start: details.startDate.isDate ? details.startDate.toString().slice(0, 10) : start.toISOString(),
-        end: details.endDate.isDate ? details.endDate.toString().slice(0, 10) : end.toISOString(),
-      });
-    };
-    if (!item.isRecurring()) add({ item, recurrenceId: item.startDate, startDate: item.startDate, endDate: item.endDate });
-    else {
-      const iterator = item.iterator();
-      for (let count = 0; count < 2000; count += 1) {
-        const occurrence = iterator.next();
-        if (!occurrence || occurrence.toJSDate().getTime() > upper) break;
-        add(item.getOccurrenceDetails(occurrence));
-      }
-    }
-  }
-  return events.sort((a, b) => a.start.localeCompare(b.start));
-}
+const CALENDAR_ID = 'f9986b287c7b91dce74e53673364bfc7247a882a399a55b4a7027a752d5a6299@group.calendar.google.com';
+const headers = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=60, s-maxage=60' };
 
 export default async (request) => {
   if (request.method !== 'GET') return new Response(JSON.stringify({ error: 'Method not allowed.' }), { status: 405, headers });
+  const key = globalThis.Netlify?.env?.get('GOOGLE_CALENDAR_API') || process.env.GOOGLE_CALENDAR_API;
+  if (!key) return new Response(JSON.stringify({ error: 'The Google Calendar API key is not configured.' }), { status: 503, headers });
   try {
-    const response = await fetch(ICS_URL, { headers: { Accept: 'text/calendar' }, signal: AbortSignal.timeout(10000) });
-    if (!response.ok) throw new Error(`Google Calendar feed failed (${response.status}).`);
-    const source = await response.text();
-    if (source.length > 3_000_000) throw new Error('Google Calendar feed is too large.');
-    return new Response(JSON.stringify({ events: parseCalendar(source) }), { headers });
+    const lower = new Date(Date.now() - 366 * 86400000).toISOString();
+    const upper = new Date(Date.now() + 730 * 86400000).toISOString();
+    const events = [];
+    let pageToken;
+    do {
+      const url = new URL(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events`);
+      url.searchParams.set('key', key);
+      url.searchParams.set('singleEvents', 'true');
+      url.searchParams.set('orderBy', 'startTime');
+      url.searchParams.set('timeMin', lower);
+      url.searchParams.set('timeMax', upper);
+      url.searchParams.set('maxResults', '2500');
+      if (pageToken) url.searchParams.set('pageToken', pageToken);
+      const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!response.ok) throw new Error(`Google Calendar read failed (${response.status}).`);
+      const body = await response.json();
+      for (const item of body.items || []) {
+        if (item.status === 'cancelled' || !item.start || !item.end) continue;
+        events.push({
+          id: item.id,
+          title: item.summary || 'Untitled event',
+          description: item.description || '',
+          location: item.location || '',
+          allDay: Boolean(item.start.date),
+          start: item.start.date || item.start.dateTime,
+          end: item.end.date || item.end.dateTime,
+        });
+      }
+      pageToken = body.nextPageToken;
+    } while (pageToken);
+    return new Response(JSON.stringify({ events }), { headers });
   } catch (error) {
     console.error('Google Calendar feed failed:', error instanceof Error ? error.message : 'Unknown error');
     return new Response(JSON.stringify({ error: 'The calendar is temporarily unavailable.' }), { status: 503, headers });

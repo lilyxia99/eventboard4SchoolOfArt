@@ -1,12 +1,10 @@
 # UNCG School of Art Eventboard
 
-A public events calendar. People submit events through the [Notion form](https://leileixia.notion.site/3ed401da165b80cb8216d9afa845ef79?pvs=105). The public event cards display only rows in the connected Notion database whose `Select` status is `Done`.
-
-The public event cards also read the connected Notion database when its `Select` status is `Done`. The Notion API key stays in the server-side Netlify Function and is never sent to the browser.
+A public events calendar. People submit events through the [Notion form](https://leileixia.notion.site/3ed401da165b80cb8216d9afa845ef79?pvs=105). Mark a dated event `In progress` when it is ready to publish. The scheduled sync creates or updates its Google Calendar event, writes the Google event ID and direct links back to Notion, then marks the row `Done`. Only linked `Done` rows appear as public event cards.
 
 ## Site
 
-The site shows Notion events marked `Done` and filters by category. Events with no date remain visible with “Date to be announced.” Its submission buttons open the Notion form. The month view reads the public Google Calendar; selecting an event opens details and offers an individual `.ics` download.
+The site shows linked `Done` Notion events and filters by category. Its submission buttons open the Notion form. The month view reads the public Google Calendar through a server-side function; selecting an event opens details and offers an individual `.ics` download. Every public Notion event has a shareable detail URL of the form `/#event-<Notion page ID>`.
 
 Run locally with Node.js 20 or newer:
 
@@ -17,7 +15,7 @@ npm run dev
 
 The production site is [uncg-school-of-art-eventboard.netlify.app](https://uncg-school-of-art-eventboard.netlify.app/). Its source is the GitHub `main` branch.
 
-## Tally form
+## Legacy Tally form (inactive)
 
 Use these fields on the published form:
 
@@ -34,7 +32,7 @@ Use these fields on the published form:
 | Image description | Long text, optional when no poster is uploaded |
 | Contact email | Email, required; kept private for editorial follow-up |
 
-Tell submitters that approved event details and poster images will become public. Do not ask for sensitive personal information. Tally keeps submissions until Codex reviews them; no webhook or Netlify Blobs storage is used by this version.
+This intake has been replaced by Notion. The old Tally review automation is paused.
 
 ## Private manual review
 
@@ -46,17 +44,17 @@ An approval saves only the editable public event fields to a site-wide Netlify B
 
 ## Notion event feed
 
-The public calendar reads the Notion database at `3ed401da-165b-802d-bd2a-dfe1077ac96b` through `/.netlify/functions/notion-events`. The first link supplied for this integration pointed to a form block inside that database, not to the database itself. The function queries the database's `Event submission` data source and includes only rows whose status column, currently named `Select`, is exactly `Done`. It maps the actual columns for event name, date, type, location, description, website, and poster. Contact person, contact email, and phone are never returned. Rows with a missing date are still included.
+The public event cards read the Notion database at `3ed401da-165b-802d-bd2a-dfe1077ac96b` through `/.netlify/functions/notion-events`. The function queries the `Event submission` data source and includes only rows whose `Select` status is `Done` and whose Google event ID and link have been recorded. It maps only public event fields; contact person, contact email, and phone are never returned. The `ID` column is Notion's read-only unique ID. `Google Event ID`, `Google Calendar`, and `Eventboard page` are writable columns that provide the reciprocal links.
 
 For deployment, add `NOTION_API_KEY` to the Netlify site's **Functions** environment scope and share this database with the Notion integration that owns the token. The ignored local `.env` supports local scripts; Netlify does not receive local `.env` values automatically. If the Notion API is unavailable, the page shows a temporary-unavailable message and does not fall back to other event sources. Older entries in `public/events.json` or the manual review queue do not appear in the event cards unless they are also added to Notion with `Select` set to `Done`.
 
 ## Google Calendar sync
 
-`sync-notion-calendar` runs every 15 minutes on Netlify's published deploy. It reads `Done` Notion rows, creates or updates dated events on calendar `f9986b287c7b91dce74e53673364bfc7247a882a399a55b4a7027a752d5a6299@group.calendar.google.com`, and removes only events previously created by this sync if their Notion row is no longer `Done`. Undated rows stay in the event cards but cannot be placed in the month view or exported as a dated `.ics` file. The site reads the Google Calendar's public iCal feed through `calendar-events`; Google may take a little time to refresh that public feed after a sync.
+`sync-notion-calendar` runs every 15 minutes on Netlify's published deploy. It reads rows with `In progress` or `Done` status. Dated rows with a title are created or updated on calendar `f9986b287c7b91dce74e53673364bfc7247a882a399a55b4a7027a752d5a6299@group.calendar.google.com`. The sync uses a stable Google event ID derived from the Notion page ID to avoid duplicates. After Google confirms the event, it fills `Google Event ID`, `Google Calendar`, and `Eventboard page`, then sets `Done`. Changing the status to `Not started` or removing the date removes only events previously created by this sync and clears their links. Undated `Done` rows are moved back to `In progress`. The month view reads Google's public Events API through `calendar-events`.
 
-To enable writes, create a Google Cloud service account in a project with the Google Calendar API enabled. Share **this calendar** with the service account email using the “Make changes to events” permission. Put the complete service account JSON in a Netlify environment variable named `GOOGLE_SERVICE_ACCOUNT_JSON`, scoped to Functions, and keep it out of the repository. The value is not available in the current local `.env`, so the sync will report a configuration error until it is supplied. Do not use the calendar's public iCal URL as a write credential.
+The existing `GOOGLE_CALENDAR_API` is an API key for reading the public calendar; place it in Netlify's Functions environment scope. It cannot authorize writes. To enable writes, create a Google Cloud service account in a project with the Google Calendar API enabled. Share **this calendar** with the service account email using the “Make changes to events” permission. Put the complete service account JSON in a Netlify environment variable named `GOOGLE_SERVICE_ACCOUNT_JSON`, scoped to Functions, and keep it out of the repository. The ignored local `.env` may contain the same variables for local operations. Do not commit either credential.
 
-## Daily Codex review
+## Legacy daily Codex review (paused)
 
 The form ID is `dWBvdK`. For local Codex reviews, keep `TALLY_API_KEY` in the ignored local `.env` file or save it in macOS Keychain with `bash scripts/store-tally-api-key.sh`. Netlify masks secret values when they are read back, so a key saved only in Netlify cannot be used by the local scheduled task. Never commit `.env`.
 

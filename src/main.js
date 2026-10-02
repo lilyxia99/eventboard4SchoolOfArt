@@ -115,7 +115,7 @@ function render() {
 }
 
 function relatedLinks(event) {
-  const links = [{ label: 'More information', url: event.eventUrl }, ...(Array.isArray(event.links) ? event.links : [])];
+  const links = [{ label: 'More information', url: event.eventUrl }, { label: 'Open in Google Calendar', url: event.calendarUrl }, ...(Array.isArray(event.links) ? event.links : [])];
   const items = links.map(({ label, url }) => {
     const href = safeURL(url);
     return href ? `<a class="event-dialog-link" href="${escapeHTML(href)}" target="_blank" rel="noopener noreferrer">${escapeHTML(label || 'More information')} ↗</a>` : '';
@@ -138,6 +138,7 @@ function openEvent(event) {
   </div>`;
   if (poster) eventDialogContent.querySelector('.event-dialog-poster').addEventListener('click', () => openImage(event));
   eventDialogContent.querySelector('.download-ics').addEventListener('click', () => downloadICS(event));
+  if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(event.id || '')) history.replaceState(null, '', `#event-${event.id}`);
   eventDialog.showModal();
 }
 
@@ -163,6 +164,9 @@ for (const dialog of [eventDialog, imageDialog]) {
   dialog.querySelector('[data-close-dialog]').addEventListener('click', () => dialog.close());
 }
 imageDialog.addEventListener('close', () => imageDialogStage.replaceChildren());
+eventDialog.addEventListener('close', () => {
+  if (location.hash.startsWith('#event-')) history.replaceState(null, '', location.pathname + location.search);
+});
 monthCalendar.addEventListener('click', (click) => {
   const button = click.target.closest('[data-calendar-index]');
   if (button) openEvent(calendarEvents[Number(button.dataset.calendarIndex)]);
@@ -218,6 +222,8 @@ async function start() {
   }
   grid.setAttribute('aria-busy', 'false');
   render();
+  const linkedId = location.hash.match(/^#event-([0-9a-f-]{36})$/i)?.[1];
+  if (linkedId) openEvent(allEvents.find((event) => event.id === linkedId));
 }
 
 start();
