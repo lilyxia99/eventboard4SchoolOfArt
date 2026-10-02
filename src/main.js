@@ -10,14 +10,10 @@ const imageDialogStage = document.querySelector('#image-dialog-stage');
 
 const escapeHTML = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const safeURL = (value) => { if (typeof value !== 'string' || !value.trim()) return ''; try { const url = new URL(value, window.location.origin); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } };
-const todayInGreensboro = () => {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
-  const value = (type) => parts.find((part) => part.type === type).value;
-  return `${value('year')}-${value('month')}-${value('day')}`;
-};
 const formatDate = (value) => {
+  if (!value) return 'Date to be announced';
   const date = new Date(`${value}T12:00:00`);
-  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+  return Number.isNaN(date.getTime()) ? 'Date to be announced' : new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
 };
 
 function render() {
@@ -117,12 +113,12 @@ async function start() {
     const response = await fetch('/.netlify/functions/notion-events', { cache: 'no-store', headers: { accept: 'application/json' } });
     if (!response.ok) throw new Error('Notion event feed unavailable');
     const body = await response.json();
-    const today = todayInGreensboro();
     allEvents = (Array.isArray(body.events) ? body.events : [])
-      .filter((event) => (event.endDate || event.date) >= today)
-      .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+      .sort((a, b) => `${a.date || '9999-12-31'} ${a.time || ''}`.localeCompare(`${b.date || '9999-12-31'} ${b.time || ''}`));
   } catch (error) {
     grid.innerHTML = '<p class="empty-state">The event list is temporarily unavailable. Please try again in a little while.</p>';
+    grid.setAttribute('aria-busy', 'false');
+    return;
   }
   grid.setAttribute('aria-busy', 'false');
   render();

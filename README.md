@@ -6,7 +6,7 @@ The public calendar also reads events from the connected Notion database when it
 
 ## Site
 
-The site shows upcoming Notion events and filters by category. Its submission buttons open the published [UNCG School of Art event form](https://tally.so/r/dWBvdK).
+The site shows Notion events marked `Done` and filters by category. Events with no date remain visible with “Date to be announced.” Its submission buttons open the published [UNCG School of Art event form](https://tally.so/r/dWBvdK).
 
 Run locally with Node.js 20 or newer:
 
@@ -46,7 +46,7 @@ An approval saves only the editable public event fields to a site-wide Netlify B
 
 ## Notion event feed
 
-The public calendar reads the Notion database at `3ed401da165b80cb8216d9afa845ef79` through `/.netlify/functions/notion-events`. The function discovers the database's data source and queries only pages whose `Status` property equals `Done`. It supports a Notion `Status` property or a select property named `Status`/`状态`. Event columns are matched by common English/Chinese names and Notion property types: title, date, time, category, location, description, event link, poster, and image description.
+The public calendar reads the Notion database at `3ed401da-165b-802d-bd2a-dfe1077ac96b` through `/.netlify/functions/notion-events`. The first link supplied for this integration pointed to a form block inside that database, not to the database itself. The function queries the database's `Event submission` data source and includes only rows whose status column, currently named `Select`, is exactly `Done`. It maps the actual columns for event name, date, type, location, description, website, and poster. Contact person, contact email, and phone are never returned. Rows with a missing date are still included.
 
 For deployment, add `NOTION_API_KEY` to the Netlify site's **Functions** environment scope and share this database with the Notion integration that owns the token. The ignored local `.env` supports local scripts; Netlify does not receive local `.env` values automatically. If the Notion API is unavailable, the page shows a temporary-unavailable message and does not fall back to other event sources. Older entries in `public/events.json` or the manual review queue do not appear in this calendar unless they are also added to Notion with `Status` set to `Done`.
 
