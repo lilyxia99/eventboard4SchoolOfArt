@@ -42,20 +42,22 @@ function safeHttps(value) {
   }
 }
 
-export function toPublicEvent(page) {
+export function toPublicEvent(page, sourcePage) {
   const properties = page.properties || {};
   const title = richText(properties['Name of the event']?.title) || 'Untitled event';
   const date = properties.Date?.date;
   const types = properties.Type?.multi_select?.map((option) => option.name) || [];
-  const category = types.find((type) => ['Exhibition', 'Talk', 'Workshop', 'Other'].includes(type)) || 'Other';
-  const description = richText(properties['Description by yourself (if you don’t use AI put it here)']?.rich_text)
+  const type = types.find((value) => ['Exhibition', 'Workshop', 'Screening', 'Lecture', 'Visiting Artist'].includes(value)) || types[0] || 'Other';
+  const category = ['Exhibition', 'Workshop'].includes(type) ? type : type === 'Lecture' || type === 'Visiting Artist' ? 'Talk' : 'Other';
+  const description = richText(properties['Published description']?.rich_text)
+    || richText(properties['Description by yourself (if you don’t use AI put it here)']?.rich_text)
     || richText(properties['AI description']?.rich_text)
     || richText(properties['Description for AI  (optional)']?.rich_text);
   const location = richText(properties['Location ']?.rich_text)
     || properties['Location (1)']?.place?.name
     || properties['Location (1)']?.place?.address
     || '';
-  const event = { id: page.id, title, category, date: date?.start?.slice(0, 10) || '', start: date?.start || '', end: date?.end || '', time: '', location, description };
+  const event = { id: page.id, title, category, type, date: date?.start?.slice(0, 10) || '', start: date?.start || '', end: date?.end || '', time: '', location, description };
   if (date?.end) event.endDate = date.end.slice(0, 10);
   if (date?.start?.includes('T')) {
     const start = new Date(date.start);
@@ -65,7 +67,8 @@ export function toPublicEvent(page) {
   }
 
   const eventUrl = safeHttps(properties['Any related website']?.url);
-  const poster = properties['Poster (highly recommend)']?.files?.[0];
+  const poster = properties['Poster (highly recommend)']?.files?.[0]
+    || sourcePage?.properties?.['Poster (highly recommend)']?.files?.[0];
   const posterUrl = safeHttps(poster?.file?.url || poster?.external?.url);
   if (eventUrl) event.eventUrl = eventUrl;
   const calendarUrl = safeHttps(properties['Google Calendar']?.url);
@@ -108,8 +111,13 @@ export async function updateNotionPage(id, properties) {
 export default async (request) => {
   if (request.method !== 'GET') return json({ error: 'Method not allowed.' }, 405);
   try {
-    const events = (await getDoneNotionPages())
-      .map(toPublicEvent)
+    const pages = await getDoneNotionPages();
+    const byId = new Map(pages.map((page) => [page.id, page]));
+    const events = pages
+      .map((page) => {
+        const sourceId = richText(page.properties?.['Source submission']?.rich_text);
+        return toPublicEvent(page, byId.get(sourceId));
+      })
       .filter((event) => event.title !== 'Untitled event');
     return json({ events });
   } catch (error) {

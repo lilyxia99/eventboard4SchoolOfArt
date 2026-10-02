@@ -24,11 +24,14 @@ export default async (request) => {
       const body = await response.json();
       for (const item of body.items || []) {
         if (item.status === 'cancelled' || !item.start || !item.end) continue;
+        const pageUrl = item.description?.match(/View on Eventboard:\s*(https:\/\/uncg-school-of-art-eventboard\.netlify\.app\/#event-[0-9a-f-]{36})/i)?.[1];
         events.push({
           id: item.id,
           title: item.summary || 'Untitled event',
           description: item.description || '',
           location: item.location || '',
+          calendarUrl: item.htmlLink || '',
+          links: pageUrl ? [{ label: 'View event page', url: pageUrl }] : [],
           allDay: Boolean(item.start.date),
           start: item.start.date || item.start.dateTime,
           end: item.end.date || item.end.dateTime,

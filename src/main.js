@@ -106,7 +106,7 @@ function render() {
     return `<article class="event-card" style="animation-delay:${Math.min(index * 70, 280)}ms">
       <button class="card-open" type="button" data-index="${index}" aria-label="View full details for ${escapeHTML(event.title)}" aria-haspopup="dialog"></button>
       <div class="event-poster${poster ? ' has-image' : ''}">${poster ? `<button class="poster-open" type="button" data-index="${index}" aria-label="Enlarge poster for ${escapeHTML(event.title)}" aria-haspopup="dialog"><img src="${escapeHTML(poster)}" alt="${escapeHTML(event.posterAlt || `Poster for ${event.title}`)}" loading="lazy" referrerpolicy="no-referrer"></button>` : `<div class="poster-fallback" aria-hidden="true" style="--poster:${index % 2 ? '#273eaa' : '#e1392f'}">${escapeHTML((event.category || 'Art').slice(0, 1))}</div>`}</div>
-      <div class="card-meta"><span class="card-category">${escapeHTML(event.category || 'Event')}</span><span>${escapeHTML(date)}</span></div>
+      <div class="card-meta"><span class="card-category">${escapeHTML(event.type || event.category || 'Event')}</span><span>${escapeHTML(date)}</span></div>
       <h3>${escapeHTML(event.title)}</h3>
       <p class="event-description">${escapeHTML(event.description || '')}</p>
       <div class="event-details"><span>${escapeHTML(event.time || '')}</span><span class="event-location">${escapeHTML(event.location || '')}</span><span class="card-open-hint">View full details ↗</span></div>
@@ -129,7 +129,7 @@ function openEvent(event) {
   const date = eventWhen(event);
   eventDialogContent.innerHTML = `<div class="event-dialog-layout${poster ? ' has-poster' : ''}">
     ${poster ? `<button class="event-dialog-poster" type="button" aria-label="Enlarge poster for ${escapeHTML(event.title)}"><img src="${escapeHTML(poster)}" alt="${escapeHTML(event.posterAlt || `Poster for ${event.title}`)}"></button>` : ''}
-    <div class="event-dialog-copy"><p class="event-dialog-category">${escapeHTML(event.category || 'Event')} · ${escapeHTML(date)}</p>
+    <div class="event-dialog-copy"><p class="event-dialog-category">${escapeHTML(event.type || event.category || 'Event')} · ${escapeHTML(date)}</p>
       <h2 id="event-dialog-title">${escapeHTML(event.title)}</h2>
       <dl class="event-dialog-facts"><div><dt>When</dt><dd>${escapeHTML(date)}</dd></div><div><dt>Where</dt><dd>${escapeHTML(event.location || 'See event details')}</dd></div></dl>
       <p class="event-dialog-description">${escapeHTML(event.description || '')}</p>${relatedLinks(event)}

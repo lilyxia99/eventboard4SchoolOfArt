@@ -45,7 +45,11 @@ async function googleRequest(url, token, method = 'GET', body) {
     headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
-  if (!response.ok) throw new Error(`Google Calendar ${method} failed (${response.status}).`);
+  if (!response.ok) {
+    const failure = await response.json().catch(() => ({}));
+    const reason = failure.error?.errors?.[0]?.reason;
+    throw new Error(`Google Calendar ${method} failed (${response.status}${reason ? `: ${reason}` : ''}).`);
+  }
   return response.status === 204 ? null : response.json();
 }
 
