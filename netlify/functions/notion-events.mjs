@@ -2,7 +2,7 @@ const DATA_SOURCE_ID = '3ed401da-165b-80e5-9451-000baea544b7';
 const NOTION_VERSION = '2025-09-03';
 const MAX_PAGES = 100;
 const RESPONSE_HEADERS = {
-  'Cache-Control': 'public, max-age=60, s-maxage=60',
+  'Cache-Control': 'no-store',
   'Content-Type': 'application/json; charset=utf-8',
   'X-Content-Type-Options': 'nosniff',
 };
@@ -111,9 +111,10 @@ export async function updateNotionPage(id, properties) {
 export default async (request) => {
   if (request.method !== 'GET') return json({ error: 'Method not allowed.' }, 405);
   try {
-    const pages = await getDoneNotionPages();
+    const pages = await getSyncNotionPages();
     const byId = new Map(pages.map((page) => [page.id, page]));
     const events = pages
+      .filter((page) => page.properties?.Select?.status?.name === 'Done')
       .map((page) => {
         const sourceId = richText(page.properties?.['Source submission']?.rich_text);
         return toPublicEvent(page, byId.get(sourceId));

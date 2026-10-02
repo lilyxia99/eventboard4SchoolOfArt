@@ -67,6 +67,8 @@ for (const [index, event] of review.events.entries()) {
   const existing = number === 1 ? source : related.find((page) => page.properties?.['Source event number']?.number === number);
   if (existing) {
     const current = existing.properties || {};
+    // Once the owner has published a reviewed row, Notion edits are authoritative.
+    if (current.Select?.status?.name === 'Done' && current['Source event number']?.number === number) continue;
     const same = richText(current['Name of the event']?.title) === event.title.trim()
       && current.Type?.multi_select?.[0]?.name === event.type
       && sameDate(current.Date?.date?.start, event.start)

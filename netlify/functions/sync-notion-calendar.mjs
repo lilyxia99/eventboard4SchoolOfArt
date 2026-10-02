@@ -96,7 +96,7 @@ function comparable(event) {
 
 export async function syncCalendar() {
   const [pages, token] = await Promise.all([getSyncNotionPages(), accessToken()]);
-  const eligible = pages.filter((page) => ['In progress', 'Done'].includes(page.properties?.Select?.status?.name));
+  const eligible = pages.filter((page) => page.properties?.Select?.status?.name === 'Done');
   const desired = new Map(eligible.map((page) => [page, googleEvent(page)]).filter(([, event]) => event).map(([page, event]) => [event.id, { page, event }]));
   const existing = await managedEvents(token);
   const counts = { created: 0, updated: 0, removed: 0, published: 0, withoutCalendar: eligible.length - desired.size };
@@ -113,9 +113,8 @@ export async function syncCalendar() {
     const siteUrl = `${SITE}/#event-${page.id}`;
     const props = page.properties || {};
     const currentId = (props['Google Event ID']?.rich_text || []).map((item) => item.plain_text || item.text?.content || '').join('');
-    if (props.Select?.status?.name !== 'Done' || props['Google Calendar']?.url !== saved.htmlLink || props['Eventboard page']?.url !== siteUrl || currentId !== id) {
+    if (props['Google Calendar']?.url !== saved.htmlLink || props['Eventboard page']?.url !== siteUrl || currentId !== id) {
       await updateNotionPage(page.id, {
-        Select: { status: { name: 'Done' } },
         'Google Event ID': { rich_text: [{ text: { content: id } }] },
         'Google Calendar': { url: saved.htmlLink },
         'Eventboard page': { url: siteUrl },
@@ -134,17 +133,16 @@ export async function syncCalendar() {
     const id = `notion${page.id.replaceAll('-', '').toLowerCase()}`;
     if (desired.has(id)) continue;
     const oldId = (props['Google Event ID']?.rich_text || []).map((item) => item.plain_text || item.text?.content || '').join('');
-    const publishWithoutDate = ['In progress', 'Done'].includes(props.Select?.status?.name)
+    const publishWithoutDate = props.Select?.status?.name === 'Done'
       && toPublicEvent(page).title !== 'Untitled event';
     const siteUrl = publishWithoutDate ? `${SITE}/#event-${page.id}` : null;
-    if (oldId || props['Google Calendar']?.url || (props['Eventboard page']?.url || null) !== siteUrl || (publishWithoutDate && props.Select?.status?.name !== 'Done')) {
+    if (oldId || props['Google Calendar']?.url || (props['Eventboard page']?.url || null) !== siteUrl) {
       await updateNotionPage(page.id, {
-        ...(publishWithoutDate && props.Select?.status?.name !== 'Done' ? { Select: { status: { name: 'Done' } } } : {}),
         'Google Event ID': { rich_text: [] },
         'Google Calendar': { url: null },
         'Eventboard page': { url: siteUrl },
       });
-      if (publishWithoutDate && props.Select?.status?.name !== 'Done') counts.published += 1;
+      if (publishWithoutDate) counts.published += 1;
     }
   }
   return counts;

@@ -4,6 +4,10 @@ let allEvents = [];
 let visibleEvents = [];
 let activeFilter = 'all';
 let calendarEvents = [];
+let currentEventId = '';
+let lastEventSignature = '';
+let hasLoadedEvents = false;
+let refreshingEvents = false;
 let selectedMonth = new Date();
 selectedMonth = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
 const monthCalendar = document.querySelector('#month-calendar');
@@ -27,6 +31,22 @@ const localDay = (value) => {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(value));
   const part = (type) => parts.find((item) => item.type === type)?.value;
   return `${part('year')}-${part('month')}-${part('day')}`;
+};
+const nextDay = (value) => {
+  const day = new Date(`${value.slice(0, 10)}T12:00:00Z`);
+  day.setUTCDate(day.getUTCDate() + 1);
+  return day.toISOString().slice(0, 10);
+};
+const toMonthEvent = (event) => {
+  const allDay = !event.start.includes('T');
+  return {
+    ...event,
+    allDay,
+    end: allDay ? nextDay(event.end || event.start) : event.end || new Date(new Date(event.start).getTime() + 3600000).toISOString(),
+  };
+};
+const stablePosterURL = (value) => {
+  try { const url = new URL(value); return `${url.origin}${url.pathname}`; } catch { return value || ''; }
 };
 const calendarTime = (event) => event.allDay ? 'All day' : new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }).format(new Date(event.start));
 const eventWhen = (event) => {
@@ -126,6 +146,7 @@ function relatedLinks(event) {
 
 function openEvent(event) {
   if (!event) return;
+  currentEventId = event.id || '';
   const poster = safeURL(event.posterUrl);
   const date = eventWhen(event);
   eventDialogContent.innerHTML = `<div class="event-dialog-layout${poster ? ' has-poster' : ''}">
@@ -140,7 +161,7 @@ function openEvent(event) {
   if (poster) eventDialogContent.querySelector('.event-dialog-poster').addEventListener('click', () => openImage(event));
   eventDialogContent.querySelector('.download-ics').addEventListener('click', () => downloadICS(event));
   if (/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(event.id || '')) history.replaceState(null, '', `#event-${event.id}`);
-  eventDialog.showModal();
+  if (!eventDialog.open) eventDialog.showModal();
 }
 
 function openImage(event) {
@@ -166,6 +187,7 @@ for (const dialog of [eventDialog, imageDialog]) {
 }
 imageDialog.addEventListener('close', () => imageDialogStage.replaceChildren());
 eventDialog.addEventListener('close', () => {
+  currentEventId = '';
   if (location.hash.startsWith('#event-')) history.replaceState(null, '', location.pathname + location.search);
 });
 monthCalendar.addEventListener('click', (click) => {
@@ -181,6 +203,40 @@ filterButtons.forEach((button) => button.addEventListener('click', () => {
   filterButtons.forEach((item) => { const selected = item === button; item.classList.toggle('is-active', selected); item.setAttribute('aria-pressed', String(selected)); });
   render();
 }));
+
+async function refreshEvents() {
+  if (refreshingEvents) return;
+  refreshingEvents = true;
+  try {
+    const response = await fetch(`/.netlify/functions/notion-events?refresh=${Date.now()}`, { cache: 'no-store', headers: { accept: 'application/json' } });
+    if (!response.ok) throw new Error('Notion event feed unavailable');
+    const body = await response.json();
+    const events = (Array.isArray(body.events) ? body.events : [])
+      .sort((a, b) => `${a.date || '9999-12-31'} ${a.time || ''}`.localeCompare(`${b.date || '9999-12-31'} ${b.time || ''}`));
+    const signature = JSON.stringify(events.map((event) => ({ ...event, posterUrl: stablePosterURL(event.posterUrl) })));
+    if (!hasLoadedEvents || signature !== lastEventSignature) {
+      allEvents = events;
+      calendarEvents = events.filter((event) => event.start).map(toMonthEvent);
+      lastEventSignature = signature;
+      render();
+      renderMonth();
+      if (eventDialog.open && currentEventId) {
+        const updated = allEvents.find((event) => event.id === currentEventId);
+        if (updated) openEvent(updated);
+        else eventDialog.close();
+      }
+    }
+    hasLoadedEvents = true;
+    monthNote.textContent = calendarEvents.length ? 'Times shown in Eastern Time.' : 'No dated events are published yet.';
+  } catch {
+    if (!hasLoadedEvents) grid.innerHTML = '<p class="empty-state">The event list is temporarily unavailable. Please try again in a little while.</p>';
+    monthNote.textContent = hasLoadedEvents ? 'Updates are temporarily unavailable; showing the last loaded events.' : 'The event list is temporarily unavailable.';
+  } finally {
+    grid.setAttribute('aria-busy', 'false');
+    monthCalendar.setAttribute('aria-busy', 'false');
+    refreshingEvents = false;
+  }
+}
 
 async function start() {
   if (window.location.hash.startsWith('#invite_token=')) {
@@ -200,31 +256,11 @@ async function start() {
     });
   }
   renderMonth();
-  fetch('/.netlify/functions/calendar-events', { cache: 'no-store' })
-    .then(async (response) => {
-      if (!response.ok) throw new Error('Calendar feed unavailable');
-      const body = await response.json();
-      calendarEvents = Array.isArray(body.events) ? body.events : [];
-      renderMonth();
-      monthNote.textContent = calendarEvents.length ? 'Times shown in Eastern Time.' : 'No events are scheduled on this Google Calendar yet.';
-      monthCalendar.setAttribute('aria-busy', 'false');
-    })
-    .catch(() => { monthNote.textContent = 'The Google Calendar is temporarily unavailable.'; monthCalendar.setAttribute('aria-busy', 'false'); });
-  try {
-    const response = await fetch('/.netlify/functions/notion-events', { cache: 'no-store', headers: { accept: 'application/json' } });
-    if (!response.ok) throw new Error('Notion event feed unavailable');
-    const body = await response.json();
-    allEvents = (Array.isArray(body.events) ? body.events : [])
-      .sort((a, b) => `${a.date || '9999-12-31'} ${a.time || ''}`.localeCompare(`${b.date || '9999-12-31'} ${b.time || ''}`));
-  } catch (error) {
-    grid.innerHTML = '<p class="empty-state">The event list is temporarily unavailable. Please try again in a little while.</p>';
-    grid.setAttribute('aria-busy', 'false');
-    return;
-  }
-  grid.setAttribute('aria-busy', 'false');
-  render();
+  await refreshEvents();
   const linkedId = location.hash.match(/^#event-([0-9a-f-]{36})$/i)?.[1];
   if (linkedId) openEvent(allEvents.find((event) => event.id === linkedId));
+  setInterval(() => { if (!document.hidden) refreshEvents(); }, 15000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshEvents(); });
 }
 
 start();
