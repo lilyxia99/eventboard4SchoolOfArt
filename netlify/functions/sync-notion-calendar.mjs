@@ -16,8 +16,13 @@ function exclusiveEnd(date) {
 async function accessToken() {
   const raw = globalThis.Netlify?.env?.get('GOOGLE_SERVICE_ACCOUNT_JSON') || process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not configured.');
-  const credentials = JSON.parse(raw);
-  if (!credentials.client_email || !credentials.private_key) throw new Error('Google service account credentials are incomplete.');
+  let credentials;
+  try {
+    credentials = JSON.parse(raw);
+  } catch {
+    throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON.');
+  }
+  if (credentials.type !== 'service_account' || !credentials.client_email || !credentials.private_key) throw new Error('Google service account credentials are incomplete.');
   const now = Math.floor(Date.now() / 1000);
   const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
   const claim = base64url(JSON.stringify({ iss: credentials.client_email, scope: 'https://www.googleapis.com/auth/calendar.events', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3500 }));
