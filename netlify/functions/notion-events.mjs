@@ -77,7 +77,10 @@ function toPublicEvent(page) {
 export default async (request) => {
   if (request.method !== 'GET') return json({ error: 'Method not allowed.' }, 405);
   const token = notionToken();
-  if (!token) return json({ error: 'The Notion event feed is temporarily unavailable.' }, 503);
+  if (!token) {
+    console.error('Notion event feed failed: NOTION_API_KEY is unavailable to the function.');
+    return json({ error: 'The Notion event feed is temporarily unavailable.' }, 503);
+  }
 
   try {
     const events = [];
@@ -96,7 +99,8 @@ export default async (request) => {
       startCursor = result.next_cursor;
     }
     throw new Error('The Notion event list is too large to load safely.');
-  } catch {
+  } catch (error) {
+    console.error('Notion event feed failed:', error instanceof Error ? error.message : 'Unknown error');
     return json({ error: 'The Notion event feed is temporarily unavailable.' }, 503);
   }
 };
