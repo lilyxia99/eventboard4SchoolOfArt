@@ -1,4 +1,4 @@
-const DATA_SOURCE_ID = '3ed401da-165b-80e5-9451-000baea544b7';
+export const DATA_SOURCE_ID = '3ed401da-165b-80e5-9451-000baea544b7';
 const NOTION_VERSION = '2025-09-03';
 const MAX_PAGES = 100;
 const RESPONSE_HEADERS = {
@@ -22,7 +22,7 @@ async function notionRequest(path, token, body, method = 'POST') {
       'Notion-Version': NOTION_VERSION,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(body),
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   if (!response.ok) throw new Error(`Notion request failed (${response.status}).`);
   return response.json();
@@ -106,6 +106,29 @@ export async function updateNotionPage(id, properties) {
   const token = notionToken();
   if (!token) throw new Error('NOTION_API_KEY is unavailable to the function.');
   return notionRequest(`pages/${id}`, token, { properties }, 'PATCH');
+}
+
+export async function createNotionEvent(properties) {
+  const token = notionToken();
+  if (!token) throw new Error('NOTION_API_KEY is unavailable to the function.');
+  return notionRequest('pages', token, { parent: { type: 'data_source_id', data_source_id: DATA_SOURCE_ID }, properties });
+}
+
+export async function uploadNotionPoster(bytes, filename, contentType) {
+  const token = notionToken();
+  if (!token) throw new Error('NOTION_API_KEY is unavailable to the function.');
+  const upload = await notionRequest('file_uploads', token, { mode: 'single_part', filename, content_type: contentType });
+  const form = new FormData();
+  form.append('file', new Blob([bytes], { type: contentType }), filename);
+  const response = await fetch(`https://api.notion.com/v1/file_uploads/${upload.id}/send`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Notion-Version': NOTION_VERSION },
+    body: form,
+  });
+  if (!response.ok) throw new Error(`Notion poster upload failed (${response.status}).`);
+  const saved = await response.json();
+  if (saved.status !== 'uploaded') throw new Error('Notion poster upload did not complete.');
+  return { name: filename, type: 'file_upload', file_upload: { id: saved.id } };
 }
 
 export default async (request) => {

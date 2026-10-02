@@ -1,5 +1,6 @@
 import { createSign } from 'node:crypto';
-import { getSyncNotionPages, toPublicEvent, updateNotionPage } from './notion-events.mjs';
+import { isIP } from 'node:net';
+import { createNotionEvent, getSyncNotionPages, toPublicEvent, updateNotionPage, uploadNotionPoster } from './notion-events.mjs';
 
 const CALENDAR_ID = 'f9986b287c7b91dce74e53673364bfc7247a882a399a55b4a7027a752d5a6299@group.calendar.google.com';
 const API = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events`;
@@ -25,7 +26,7 @@ async function accessToken() {
   if (credentials.type !== 'service_account' || !credentials.client_email || !credentials.private_key) throw new Error('Google service account credentials are incomplete.');
   const now = Math.floor(Date.now() / 1000);
   const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const claim = base64url(JSON.stringify({ iss: credentials.client_email, scope: 'https://www.googleapis.com/auth/calendar.events', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3500 }));
+  const claim = base64url(JSON.stringify({ iss: credentials.client_email, scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.readonly', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3500 }));
   const unsigned = `${header}.${claim}`;
   const signer = createSign('RSA-SHA256');
   signer.update(unsigned);
@@ -89,6 +90,135 @@ async function managedEvents(token) {
   return events;
 }
 
+async function allCalendarEvents(token) {
+  const events = [];
+  let pageToken;
+  do {
+    const url = new URL(API);
+    url.searchParams.set('maxResults', '2500');
+    if (pageToken) url.searchParams.set('pageToken', pageToken);
+    const result = await googleRequest(url, token);
+    events.push(...(result.items || []));
+    pageToken = result.nextPageToken;
+  } while (pageToken);
+  return events;
+}
+
+const propertyText = (property) => (property?.rich_text || []).map((part) => part.plain_text || part.text?.content || '').join('');
+const textProperty = (value) => ({ rich_text: value ? [{ text: { content: value.slice(0, 2000) } }] : [] });
+
+function descriptionLinks(description) {
+  const urls = [...String(description || '').matchAll(/https:\/\/[^\s<>"']+/gi)]
+    .map((match) => match[0].replace(/[),.;]+$/, ''));
+  const safe = urls.filter((value) => {
+    try {
+      const url = new URL(value);
+      const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+      if (url.protocol !== 'https:' || host === 'localhost' || host.endsWith('.local')) return false;
+      if (isIP(host)) {
+        if (host.includes(':')) return !/^(?:fe80:|fc|fd|::1$|::$)/i.test(host);
+        const [a, b] = host.split('.').map(Number);
+        return !(a === 0 || a === 10 || a === 127 || a >= 224 || (a === 169 && b === 254)
+          || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168));
+      }
+      return true;
+    } catch { return false; }
+  });
+  const image = safe.find((url) => /\.(?:png|jpe?g|webp|gif)(?:[?#]|$)/i.test(url));
+  const website = safe.find((url) => url !== image && !url.includes('uncg-school-of-art-eventboard.netlify.app'));
+  return { image, website };
+}
+
+function notionDate(event) {
+  const start = event.start?.dateTime || event.start?.date;
+  if (!start) return null;
+  if (event.start?.date) {
+    const end = event.end?.date;
+    if (!end) return { start };
+    const last = new Date(`${end}T12:00:00Z`);
+    last.setUTCDate(last.getUTCDate() - 1);
+    const inclusive = last.toISOString().slice(0, 10);
+    return inclusive > start ? { start, end: inclusive } : { start };
+  }
+  return { start, ...(event.end?.dateTime ? { end: event.end.dateTime } : {}) };
+}
+
+async function calendarPoster(event, token) {
+  const attached = (event.attachments || []).find((item) => /^image\/(?:png|jpeg|webp|gif)$/.test(item.mimeType || '') && item.fileId);
+  const imageUrl = descriptionLinks(event.description).image;
+  if (!attached && !imageUrl) return null;
+  let response;
+  let filename;
+  if (attached) {
+    response = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(attached.fileId)}?alt=media`, { headers: { Authorization: `Bearer ${token}` } });
+    filename = attached.title || 'calendar-poster';
+  }
+  if ((!response?.ok) && imageUrl) {
+    response = await fetch(imageUrl, { redirect: 'error', signal: AbortSignal.timeout(10000) });
+    filename = new URL(imageUrl).pathname.split('/').pop() || 'calendar-poster';
+  }
+  if (!response.ok) throw new Error(`Calendar poster could not be read (${response.status}).`);
+  const headerMime = (response.headers.get('content-type') || '').split(';')[0].toLowerCase();
+  const mime = headerMime === 'application/octet-stream' ? attached?.mimeType : (headerMime || attached?.mimeType || '');
+  const extension = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' }[mime];
+  if (!extension) throw new Error('Calendar poster is not a supported image.');
+  if (Number(response.headers.get('content-length')) > 10 * 1024 * 1024) throw new Error('Calendar poster exceeds 10 MB.');
+  const bytes = await response.arrayBuffer();
+  if (bytes.byteLength > 10 * 1024 * 1024) throw new Error('Calendar poster exceeds 10 MB.');
+  filename = filename.replace(/[^a-zA-Z0-9._-]/g, '-').slice(0, 100);
+  if (!filename.toLowerCase().endsWith(`.${extension}`)) filename = `${filename}.${extension}`;
+  return uploadNotionPoster(bytes, filename, mime);
+}
+
+async function importCalendarEvent(event, page, token) {
+  const title = (event.summary || '').trim();
+  if (!title || !notionDate(event)) return null;
+  const description = String(event.description || '').replace(/<[^>]+>/g, ' ').trim();
+  const { website, image } = descriptionLinks(event.description);
+  const current = page?.properties || {};
+  const properties = {
+    'Name of the event': { title: [{ text: { content: title.slice(0, 2000) } }] },
+    Date: { date: notionDate(event) },
+    'Location ': textProperty(event.location || ''),
+    'Published description': textProperty(description),
+    'Any related website': { url: website || null },
+    'Google Event ID': textProperty(event.id),
+    'Google Calendar': { url: event.htmlLink || null },
+    'Source submission': textProperty(`google-calendar:${event.updated || event.etag || event.id}`),
+  };
+  if (!page) properties.Select = { status: { name: 'Done' } };
+  const revision = propertyText(current['Source submission']);
+  const changedAtGoogle = !page || revision !== `google-calendar:${event.updated || event.etag || event.id}`;
+  if (!changedAtGoogle) return page;
+  if ((image || event.attachments?.length) && (!page || changedAtGoogle)) {
+    try {
+      const poster = await calendarPoster(event, token);
+      if (poster) properties['Poster (highly recommend)'] = { files: [poster] };
+    } catch (error) {
+      console.warn(`Calendar poster import skipped for ${event.id}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+  if (page) {
+    return updateNotionPage(page.id, properties);
+  }
+  const created = await createNotionEvent(properties);
+  await updateNotionPage(created.id, { 'Eventboard page': { url: `${SITE}/#event-${created.id}` } });
+  return created;
+}
+
+function notionChangesForGoogle(page, event) {
+  const published = toPublicEvent(page);
+  if (!published.start) return null;
+  const allDay = !published.start.includes('T');
+  const start = allDay ? { date: published.date } : { dateTime: published.start, timeZone: 'America/New_York' };
+  const end = allDay ? { date: exclusiveEnd(published.end || published.date) }
+    : { dateTime: published.end?.includes('T') ? published.end : new Date(new Date(published.start).getTime() + 3600000).toISOString(), timeZone: 'America/New_York' };
+  const description = published.eventUrl && !published.description.includes(published.eventUrl)
+    ? [published.description, published.eventUrl].filter(Boolean).join('\n\n') : published.description;
+  const desired = { summary: published.title, description, location: published.location, start, end };
+  return comparable(desired) === comparable(event) ? null : desired;
+}
+
 function comparable(event) {
   const date = (value) => value?.date || (value?.dateTime ? new Date(value.dateTime).toISOString() : '');
   return JSON.stringify([event.summary || '', event.description || '', event.location || '', date(event.start), date(event.end)]);
@@ -96,10 +226,46 @@ function comparable(event) {
 
 export async function syncCalendar() {
   const [pages, token] = await Promise.all([getSyncNotionPages(), accessToken()]);
-  const eligible = pages.filter((page) => page.properties?.Select?.status?.name === 'Done');
+  const calendarEvents = await allCalendarEvents(token);
+  const pagesByGoogleId = new Map(pages.map((page) => [propertyText(page.properties?.['Google Event ID']), page]).filter(([id]) => id));
+  const counts = { imported: 0, refreshed: 0, created: 0, updated: 0, removed: 0, published: 0, withoutCalendar: 0 };
+  for (const event of calendarEvents) {
+    if (event.status === 'cancelled' || (event.eventType && event.eventType !== 'default')) continue;
+    if (event.extendedProperties?.private?.source === SOURCE || event.id?.startsWith('notion')) continue;
+    const existingPage = pagesByGoogleId.get(event.id);
+    let result;
+    const revision = propertyText(existingPage?.properties?.['Source submission']);
+    if (existingPage && revision === `google-calendar:${event.updated || event.etag || event.id}`) {
+      const changes = notionChangesForGoogle(existingPage, event);
+      if (changes) {
+        const saved = await googleRequest(`${API}/${encodeURIComponent(event.id)}`, token, 'PATCH', changes);
+        await updateNotionPage(existingPage.id, { 'Source submission': textProperty(`google-calendar:${saved.updated || saved.etag || saved.id}`) });
+        counts.updated += 1;
+      }
+      result = existingPage;
+    } else result = await importCalendarEvent(event, existingPage, token);
+    if (result) {
+      if (existingPage && result !== existingPage) counts.refreshed += 1;
+      if (!existingPage) {
+        pages.push(result);
+        pagesByGoogleId.set(event.id, result);
+        counts.imported += 1;
+      }
+    }
+  }
+  const activeCalendarIds = new Set(calendarEvents.filter((event) => event.status !== 'cancelled').map((event) => event.id));
+  for (const page of pages) {
+    if (!propertyText(page.properties?.['Source submission']).startsWith('google-calendar:')) continue;
+    const id = propertyText(page.properties?.['Google Event ID']);
+    if (!id || activeCalendarIds.has(id) || page.properties?.Select?.status?.name !== 'Done') continue;
+    await updateNotionPage(page.id, { Select: { status: { name: 'In progress' } }, 'Google Calendar': { url: null } });
+    counts.removed += 1;
+  }
+  const eligible = pages.filter((page) => page.properties?.Select?.status?.name === 'Done'
+    && (!propertyText(page.properties?.['Google Event ID']) || propertyText(page.properties?.['Google Event ID']).startsWith('notion')));
   const desired = new Map(eligible.map((page) => [page, googleEvent(page)]).filter(([, event]) => event).map(([page, event]) => [event.id, { page, event }]));
   const existing = await managedEvents(token);
-  const counts = { created: 0, updated: 0, removed: 0, published: 0, withoutCalendar: eligible.length - desired.size };
+  counts.withoutCalendar = eligible.length - desired.size;
   for (const [id, { page, event }] of desired) {
     let saved;
     if (!existing.has(id)) {
@@ -130,6 +296,8 @@ export async function syncCalendar() {
   }
   for (const page of pages) {
     const props = page.properties || {};
+    const externalId = propertyText(props['Google Event ID']);
+    if (externalId && !externalId.startsWith('notion')) continue;
     const id = `notion${page.id.replaceAll('-', '').toLowerCase()}`;
     if (desired.has(id)) continue;
     const oldId = (props['Google Event ID']?.rich_text || []).map((item) => item.plain_text || item.text?.content || '').join('');
@@ -153,10 +321,10 @@ export default async () => {
   if (!configured) return new Response(JSON.stringify({ skipped: 'Google Calendar write credentials are not configured on Netlify.' }), { headers: { 'Content-Type': 'application/json' } });
   try {
     const counts = await syncCalendar();
-    console.log('Notion to Google Calendar sync:', counts);
+    console.log('Notion and Google Calendar sync:', counts);
     return new Response(JSON.stringify(counts), { headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
-    console.error('Notion to Google Calendar sync failed:', error instanceof Error ? error.message : 'Unknown error');
+    console.error('Notion and Google Calendar sync failed:', error instanceof Error ? error.message : 'Unknown error');
     return new Response('Calendar sync failed.', { status: 503 });
   }
 };

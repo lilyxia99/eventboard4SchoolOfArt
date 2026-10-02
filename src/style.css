@@ -15,6 +15,7 @@
 .event-poster.has-image .poster-open:focus-visible{outline:3px solid var(--blue);outline-offset:-3px}
 .event-poster.has-image .poster-open img{display:block;width:100%;height:auto;object-fit:contain}
 .card-open-hint{color:var(--blue);font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.card-event-link{position:relative;z-index:2;color:var(--blue);font-weight:700;text-decoration:underline;text-underline-offset:3px}
 .event-dialog{width:min(900px,calc(100vw - 2rem));max-width:900px;max-height:min(88vh,900px);padding:0;border:1px solid var(--line);background:var(--paper);color:var(--ink);box-shadow:0 20px 70px rgba(0,0,0,.25)}
 .event-dialog::backdrop{background:rgba(12,15,24,.72)}
 .event-dialog-shell{position:relative}

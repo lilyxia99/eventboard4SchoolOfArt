@@ -123,14 +123,15 @@ function render() {
   }
   grid.innerHTML = events.map((event, index) => {
     const poster = safeURL(event.posterUrl);
+    const eventLink = safeURL(event.eventUrl);
     const date = event.endDate ? `${formatDate(event.date)} – ${formatDate(event.endDate)}` : formatDate(event.date);
     return `<article class="event-card" style="animation-delay:${Math.min(index * 70, 280)}ms">
       <button class="card-open" type="button" data-index="${index}" aria-label="View full details for ${escapeHTML(event.title)}" aria-haspopup="dialog"></button>
-      <div class="event-poster${poster ? ' has-image' : ''}">${poster ? `<button class="poster-open" type="button" data-index="${index}" aria-label="Enlarge poster for ${escapeHTML(event.title)}" aria-haspopup="dialog"><img src="${escapeHTML(poster)}" alt="${escapeHTML(event.posterAlt || `Poster for ${event.title}`)}" loading="lazy" referrerpolicy="no-referrer"></button>` : `<div class="poster-fallback" aria-hidden="true" style="--poster:${index % 2 ? '#273eaa' : '#e1392f'}">${escapeHTML((event.category || 'Art').slice(0, 1))}</div>`}</div>
+      ${poster ? `<div class="event-poster has-image"><button class="poster-open" type="button" data-index="${index}" aria-label="Enlarge poster for ${escapeHTML(event.title)}" aria-haspopup="dialog"><img src="${escapeHTML(poster)}" alt="${escapeHTML(event.posterAlt || `Poster for ${event.title}`)}" loading="lazy" referrerpolicy="no-referrer"></button></div>` : ''}
       <div class="card-meta"><span class="card-category">${escapeHTML(event.type || event.category || 'Event')}</span><span>${escapeHTML(date)}</span></div>
       <h3>${escapeHTML(event.title)}</h3>
       <p class="event-description">${escapeHTML(event.description || '')}</p>
-      <div class="event-details"><span>${escapeHTML(event.time || '')}</span><span class="event-location">${escapeHTML(event.location || '')}</span><span class="card-open-hint">View full details ↗</span></div>
+      <div class="event-details"><span>${escapeHTML(event.time || '')}</span><span class="event-location">${escapeHTML(event.location || '')}</span>${eventLink ? `<a class="card-event-link" href="${escapeHTML(eventLink)}" target="_blank" rel="noopener noreferrer">Event link ↗</a>` : ''}<span class="card-open-hint">View full details ↗</span></div>
     </article>`;
   }).join('');
 }
