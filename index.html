@@ -42,7 +42,14 @@
           <p class="update-note"><span aria-hidden="true">✳</span> Updated as events are approved</p>
         </div>
         <details class="filter-panel" id="filter-panel">
-          <summary>Filter by tag <span id="filter-summary">All events</span></summary>
+          <summary>Filter events <span id="filter-summary">Upcoming · All tags</span></summary>
+          <p class="filter-label">When</p>
+          <div class="filters" id="time-filters" role="group" aria-label="Filter events by time">
+            <button type="button" class="filter-button is-active" data-time="upcoming" aria-pressed="true">Upcoming</button>
+            <button type="button" class="filter-button" data-time="past" aria-pressed="false">Past events</button>
+            <button type="button" class="filter-button" data-time="all" aria-pressed="false">All dates</button>
+          </div>
+          <p class="filter-label">Tags</p>
           <div class="filters" id="tag-filters" role="group" aria-label="Filter events by tag"></div>
         </details>
         <div class="event-grid" id="event-grid" aria-live="polite" aria-busy="true">

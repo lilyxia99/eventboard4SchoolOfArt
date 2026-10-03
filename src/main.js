@@ -1,9 +1,11 @@
 const grid = document.querySelector('#event-grid');
 const tagFilters = document.querySelector('#tag-filters');
+const timeFilters = document.querySelector('#time-filters');
 const filterSummary = document.querySelector('#filter-summary');
 let allEvents = [];
 let visibleEvents = [];
 const selectedTags = new Set();
+let activeTimeFilter = 'upcoming';
 let calendarEvents = [];
 let currentEventId = '';
 let lastEventSignature = '';
@@ -32,6 +34,19 @@ const localDay = (value) => {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(value));
   const part = (type) => parts.find((item) => item.type === type)?.value;
   return `${part('year')}-${part('month')}-${part('day')}`;
+};
+const isPastEvent = (event, now) => {
+  const start = event.start || event.date;
+  if (!start) return false;
+  const end = event.end || event.endDate || start;
+  if (!String(start).includes('T') || !String(end).includes('T')) {
+    const lastDay = String(end).slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(lastDay) && lastDay < localDay(now.toISOString());
+  }
+  const startTime = Date.parse(start);
+  const endTime = event.end ? Date.parse(end) : NaN;
+  const deadline = Number.isFinite(endTime) ? endTime : Number.isFinite(startTime) ? startTime + 3600000 : NaN;
+  return Number.isFinite(deadline) && deadline <= now.getTime();
 };
 const nextDay = (value) => {
   const day = new Date(`${value.slice(0, 10)}T12:00:00Z`);
@@ -115,10 +130,15 @@ function downloadICS(event) {
 }
 
 function render() {
-  const events = allEvents.filter((event) => !selectedTags.size || [...selectedTags].some((tag) => eventTags(event).includes(tag)));
+  const now = new Date();
+  const events = allEvents.filter((event) => {
+    const past = isPastEvent(event, now);
+    const matchesTime = activeTimeFilter === 'all' || (activeTimeFilter === 'past' ? past : !past);
+    return matchesTime && (!selectedTags.size || [...selectedTags].some((tag) => eventTags(event).includes(tag)));
+  });
   visibleEvents = events;
   if (!events.length) {
-    const message = allEvents.length ? 'No events match these tags. Try another filter.' : 'No events are listed right now. Check back soon, or share something happening in our community.';
+    const message = allEvents.length ? 'No events match these filters. Try another date or tag.' : 'No events are listed right now. Check back soon, or share something happening in our community.';
     grid.innerHTML = `<p class="empty-state">${escapeHTML(message)}</p>`;
     return;
   }
@@ -141,8 +161,9 @@ const eventTags = (event) => [...new Set((Array.isArray(event.tags) && event.tag
 function renderFilters() {
   const tags = [...new Set(allEvents.flatMap(eventTags))].sort((a, b) => a.localeCompare(b));
   for (const selected of selectedTags) if (!tags.includes(selected)) selectedTags.delete(selected);
-  tagFilters.innerHTML = `<button type="button" class="filter-button${selectedTags.size ? '' : ' is-active'}" data-tag-all aria-pressed="${!selectedTags.size}">All events</button>${tags.map((tag) => `<button type="button" class="filter-button${selectedTags.has(tag) ? ' is-active' : ''}" data-tag="${escapeHTML(tag)}" aria-pressed="${selectedTags.has(tag)}">${escapeHTML(tag)}</button>`).join('')}`;
-  filterSummary.textContent = selectedTags.size ? `${selectedTags.size} selected` : 'All events';
+  tagFilters.innerHTML = `<button type="button" class="filter-button${selectedTags.size ? '' : ' is-active'}" data-tag-all aria-pressed="${!selectedTags.size}">All tags</button>${tags.map((tag) => `<button type="button" class="filter-button${selectedTags.has(tag) ? ' is-active' : ''}" data-tag="${escapeHTML(tag)}" aria-pressed="${selectedTags.has(tag)}">${escapeHTML(tag)}</button>`).join('')}`;
+  const timeLabel = { upcoming: 'Upcoming', past: 'Past events', all: 'All dates' }[activeTimeFilter];
+  filterSummary.textContent = `${timeLabel} · ${selectedTags.size ? `${selectedTags.size} tags` : 'All tags'}`;
 }
 
 function relatedLinks(event) {
@@ -218,6 +239,18 @@ tagFilters.addEventListener('click', (click) => {
   renderFilters();
   render();
 });
+timeFilters.addEventListener('click', (click) => {
+  const button = click.target.closest('[data-time]');
+  if (!button) return;
+  activeTimeFilter = button.dataset.time;
+  timeFilters.querySelectorAll('[data-time]').forEach((item) => {
+    const selected = item === button;
+    item.classList.toggle('is-active', selected);
+    item.setAttribute('aria-pressed', String(selected));
+  });
+  renderFilters();
+  render();
+});
 
 async function refreshEvents() {
   if (refreshingEvents) return;
@@ -241,7 +274,7 @@ async function refreshEvents() {
         if (updated) openEvent(updated);
         else eventDialog.close();
       }
-    }
+    } else render();
     hasLoadedEvents = true;
     monthNote.textContent = calendarEvents.length ? 'Times shown in Eastern Time.' : 'No dated events are published yet.';
   } catch {
