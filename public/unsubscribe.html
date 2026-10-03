@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Unsubscribe — School of Art Eventboard</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-uncg.png" />
+    <style>body{margin:0;background:#f5f7fa;color:#181916;font:1rem/1.6 system-ui,sans-serif}main{max-width:640px;margin:10vh auto;padding:2rem}h1{font-size:clamp(2rem,6vw,3rem);line-height:1.1}label{display:block;font-weight:700;margin:1.5rem 0 .4rem}input[type=email]{box-sizing:border-box;width:100%;padding:.8rem;border:1px solid #8e8d85;background:#fff;font:inherit}button{margin:1rem 0;padding:.8rem 1.2rem;border:0;background:#181916;color:#fff;font:700 1rem system-ui;cursor:pointer}button:hover,button:focus-visible{background:#273eaa}a{color:#273eaa}.honeypot{position:absolute;left:-9999px}</style>
+  </head>
+  <body>
+    <main>
+      <p><a href="/">← Back to events</a></p>
+      <h1>Unsubscribe from weekly event emails</h1>
+      <p>Enter the address that receives the School of Art Eventboard newsletter. We will stop sending to that address. You can also reply “unsubscribe” to any issue.</p>
+      <form name="eventboard-unsubscribe" method="POST" action="/unsubscribe-thanks" data-netlify="true" netlify-honeypot="bot-field">
+        <input type="hidden" name="form-name" value="eventboard-unsubscribe" />
+        <p class="honeypot"><label>Leave this field empty <input name="bot-field" /></label></p>
+        <label for="unsubscribe-email">Email address</label>
+        <input id="unsubscribe-email" name="email" type="email" autocomplete="email" required maxlength="254" />
+        <button type="submit">Unsubscribe</button>
+      </form>
+      <p>Your email stays private and is used only to process this request.</p>
+    </main>
+  </body>
+</html>
