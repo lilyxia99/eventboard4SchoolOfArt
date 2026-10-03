@@ -50,24 +50,24 @@
 @media(max-width:650px){.event-dialog-layout.has-poster{grid-template-columns:1fr}.event-dialog-layout{padding:1.25rem}.event-dialog-poster{max-width:260px}.dialog-close{top:.5rem;margin:.5rem .5rem 0 0}}
 
 /* Google Calendar month view */
-.month-section{padding:3.5rem clamp(1.25rem,5.2vw,5.5rem) 4rem}
+.month-section{padding:3.5rem clamp(1.25rem,5.2vw,5.5rem) 4rem;color:#fff;background-color:#112855;background-image:linear-gradient(90deg,rgba(8,24,57,.8),rgba(8,24,57,.64)),url('/pixel-soa-month-bg.png');background-position:center;background-size:cover}
 .month-intro{display:flex;align-items:end;justify-content:space-between;gap:2rem;margin-bottom:2.5rem}
-.month-intro .eyebrow{margin-bottom:.7rem}
+.month-intro .eyebrow{margin-bottom:.7rem;color:#eef3ff}
 .month-intro h1{font-family: "Barrio", system-ui;
   font-weight: 400;
   font-style: normal;
   font-size:3rem;
   ;letter-spacing:-.05em;margin:0}
-.month-intro>p{color:#595951;line-height:1.5;max-width:285px;margin:0}
+.month-intro>p{color:#fff;line-height:1.5;max-width:285px;margin:0}
 .month-toolbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
 .month-toolbar h2{font-family: "Barrio", system-ui;
   font-weight: 400;
   font-style: normal;
   font-size:1.5rem;;margin:0}
 .month-actions{display:flex;gap:.45rem}
-.month-actions button{min-width:2.5rem;padding:.55rem .75rem;background:transparent;border:1px solid var(--line);font:600 .8rem var(--mono);cursor:pointer}
+.month-actions button{min-width:2.5rem;padding:.55rem .75rem;background:#fffdf8;color:#181916;border:1px solid #fffdf8;font:600 .8rem var(--mono);cursor:pointer}
 .month-actions button:hover,.month-actions button:focus-visible{background:var(--ink);color:white}
-.month-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line);background:#fffdf8}
+.month-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line);background:#fffdf8;color:#181916}
 .month-weekday{text-align:center;padding:.7rem .2rem;background:#e8e2d6;border-right:1px solid var(--line);border-bottom:1px solid var(--line);font:500 .68rem var(--mono);text-transform:uppercase}
 .month-day{min-height:112px;min-width:0;padding:.45rem;background:#fffdf8;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
 .month-day.is-outside{background:#f3efe7;color:#77746d}
@@ -77,7 +77,7 @@
 .month-event:hover,.month-event:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
 .month-event-time{font-family:var(--mono);font-size:.62rem}
 .month-more{display:block;font:.65rem var(--mono);color:#5d5c54}
-.month-note{min-height:1.2rem;color:#66635c;font:.875rem var(--mono);margin:1rem 0 0}
+.month-note{min-height:1.2rem;color:#fff;font:.875rem var(--mono);margin:1rem 0 0}
 .download-ics{margin-top:1.25rem;padding:.75rem 1rem;border:0;background:var(--blue);color:#fff;font:700 .8rem 'DM Sans',sans-serif;cursor:pointer}
 .download-ics:hover,.download-ics:focus-visible{background:var(--ink)}
 .download-ics:disabled{background:#c4c1bc;color:#504f4c;cursor:not-allowed}
