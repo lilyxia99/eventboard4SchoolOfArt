@@ -6,9 +6,10 @@ const calendarHighlightFilters = document.querySelector('#calendar-highlight-fil
 const timeFilters = document.querySelector('#time-filters');
 const filterSummary = document.querySelector('#filter-summary');
 const calendarFilterSummary = document.querySelector('#calendar-filter-summary');
+const HIDDEN_SCHOOL_TAGS = ['School of Music', 'School of Dance', 'School of Theatre'];
 let allEvents = [];
 let visibleEvents = [];
-const newFilterSelection = () => ({ tags: new Set(), highlights: new Set(), knownTags: new Set(), knownHighlights: new Set() });
+const newFilterSelection = () => ({ tags: new Set(), highlights: new Set(), knownTags: new Set(), knownHighlights: new Set(), selectNewTags: true, selectNewSchoolTags: false });
 const tileSelection = newFilterSelection();
 const calendarSelection = newFilterSelection();
 let filtersSynced = true;
@@ -65,6 +66,9 @@ const nextDay = (value) => {
   day.setUTCDate(day.getUTCDate() + 1);
   return day.toISOString().slice(0, 10);
 };
+const previousDay = (value) => new Date(Date.parse(`${value.slice(0, 10)}T12:00:00Z`) - 86400000).toISOString().slice(0, 10);
+const dateKey = (day) => `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+const dayDistance = (start, end) => Math.round((Date.parse(`${end}T12:00:00Z`) - Date.parse(`${start}T12:00:00Z`)) / 86400000);
 const toMonthEvent = (event) => {
   const allDay = !event.start.includes('T');
   return {
@@ -77,6 +81,8 @@ const stablePosterURL = (value) => {
   try { const url = new URL(value); return `${url.origin}${url.pathname}`; } catch { return value || ''; }
 };
 const calendarTime = (event) => event.allDay ? 'All day' : new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }).format(new Date(event.start));
+const calendarEndDay = (event) => event.allDay ? previousDay(event.end)
+  : localDay(new Date(new Date(event.end).getTime() - 1).toISOString());
 const eventWhen = (event) => {
   if (!event.start) return event.time || formatDate(event.date);
   if (event.allDay || !event.start.includes('T')) return `${formatDate(localDay(event.start))}${event.endDate ? ` – ${formatDate(event.endDate)}` : ''} · All day`;
@@ -85,6 +91,10 @@ const eventWhen = (event) => {
   const date = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'long', day: 'numeric', year: 'numeric' }).format(start);
   const time = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }).format(start);
   const endTime = end && !Number.isNaN(end.getTime()) ? new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }).format(end) : '';
+  if (endTime && localDay(event.start) !== localDay(end.toISOString())) {
+    const endDate = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'long', day: 'numeric', year: 'numeric' }).format(end);
+    return `${date} · ${time} – ${endDate} · ${endTime} ET`;
+  }
   return `${date} · ${time}${endTime ? `–${endTime}` : ''} ET`;
 };
 
@@ -97,25 +107,52 @@ function renderMonth() {
   gridStart.setDate(1 - first.getDay());
   const last = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
   const cells = Math.ceil((first.getDay() + last.getDate()) / 7) * 7;
-  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => `<div class="month-weekday">${day}</div>`).join('');
-  const days = Array.from({ length: cells }, (_, offset) => {
-    const day = new Date(gridStart);
-    day.setDate(gridStart.getDate() + offset);
-    const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-    const matches = filteredEvents.filter(({ event }) => {
-      const start = localDay(event.start);
-      const end = event.allDay ? localDay(event.end) : localDay(new Date(new Date(event.end).getTime() - 1).toISOString());
-      return key >= start && key <= (event.allDay ? localDay(new Date(new Date(`${end}T12:00:00Z`).getTime() - 86400000).toISOString()) : end);
-    });
-    const buttons = matches.map(({ event, index }) => {
-      const firstTag = eventTags(event)[0];
-      return `<button type="button" class="month-event${tagColorClass(event.tagColors?.[firstTag])}" data-calendar-index="${index}" aria-label="${escapeHTML(event.title)}, ${escapeHTML(eventWhen(event))}"><span class="month-event-time">${escapeHTML(calendarTime(event))}</span> ${escapeHTML(event.title)}</button>`;
+  const weekdays = `<div class="month-weekdays">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => `<div class="month-weekday">${day}</div>`).join('')}</div>`;
+  const today = localDay(new Date().toISOString());
+  let visibleThisMonth = 0;
+  const weeks = Array.from({ length: cells / 7 }, (_, weekIndex) => {
+    const weekStart = new Date(gridStart);
+    weekStart.setDate(gridStart.getDate() + weekIndex * 7);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    const startKey = dateKey(weekStart);
+    const endKey = dateKey(weekEnd);
+    const segments = filteredEvents.flatMap(({ event, index }) => {
+      const eventStart = localDay(event.start);
+      const eventEnd = calendarEndDay(event);
+      if (eventStart > endKey || eventEnd < startKey) return [];
+      const clippedStart = eventStart < startKey ? startKey : eventStart;
+      const clippedEnd = eventEnd > endKey ? endKey : eventEnd;
+      return [{ event, index, eventStart, eventEnd, startColumn: dayDistance(startKey, clippedStart) + 1, span: dayDistance(clippedStart, clippedEnd) + 1 }];
+    }).sort((a, b) => a.startColumn - b.startColumn || b.span - a.span || a.event.title.localeCompare(b.event.title));
+    const laneEnds = [];
+    for (const segment of segments) {
+      let lane = laneEnds.findIndex((endColumn) => endColumn < segment.startColumn);
+      if (lane < 0) lane = laneEnds.length;
+      laneEnds[lane] = segment.startColumn + segment.span - 1;
+      segment.lane = lane;
+      if (segment.eventEnd >= dateKey(first) && segment.eventStart <= dateKey(last)) visibleThisMonth += 1;
+    }
+    const laneCount = Math.max(1, laneEnds.length);
+    const days = Array.from({ length: 7 }, (_, column) => {
+      const day = new Date(weekStart);
+      day.setDate(weekStart.getDate() + column);
+      const key = dateKey(day);
+      return `<div class="month-day${day.getMonth() === selectedMonth.getMonth() ? '' : ' is-outside'}${key === today ? ' is-today' : ''}" style="grid-column:${column + 1};grid-row:1 / span ${laneCount + 2}"><span class="month-day-number">${day.getDate()}</span></div>`;
     }).join('');
-    return `<div class="month-day${day.getMonth() === selectedMonth.getMonth() ? '' : ' is-outside'}${key === localDay(new Date().toISOString()) ? ' is-today' : ''}"><span class="month-day-number">${day.getDate()}</span>${buttons}</div>`;
+    const bars = segments.map(({ event, index, eventStart, eventEnd, startColumn, span, lane }) => {
+      const firstTag = eventTags(event)[0];
+      const continuing = eventStart < startKey;
+      const continues = eventEnd > endKey;
+      const time = eventStart === eventEnd && !continuing ? `<span class="month-event-time">${escapeHTML(calendarTime(event))}</span> ` : '';
+      return `<button type="button" class="month-event${tagColorClass(event.tagColors?.[firstTag])}${continuing ? ' is-continuation' : ''}${continues ? ' continues-next' : ''}" style="grid-column:${startColumn} / span ${span};grid-row:${lane + 2}" data-calendar-index="${index}" aria-label="${escapeHTML(event.title)}, ${escapeHTML(eventWhen(event))}">${time}${escapeHTML(event.title)}</button>`;
+    }).join('');
+    return `<div class="month-week" style="--lanes:${laneCount}">${days}${bars}</div>`;
   }).join('');
-  monthCalendar.innerHTML = weekdays + days;
+  monthCalendar.innerHTML = weekdays + weeks;
   monthNote.textContent = !calendarEvents.length ? 'No dated events are published yet.'
-    : !filteredEvents.length ? 'No events match the calendar filters.' : 'Times shown in Eastern Time.';
+    : !filteredEvents.length ? 'No events match the calendar filters.'
+      : !visibleThisMonth ? 'No events match this month.' : 'Times shown in Eastern Time.';
 }
 
 const icsEscape = (value) => String(value || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
@@ -183,14 +220,24 @@ const eventHighlightTags = (event) => [...new Set((Array.isArray(event.highlight
 const highlightTagMarkup = (event, tag) => `<span class="event-tag highlight-tag${tagColorClass(event.highlightTagColors?.[tag])}">${escapeHTML(tag)}</span>`;
 const matchesSelectedOptions = (eventOptions, selected, available) => !available.length || selected.size === available.length
   || (selected.size > 0 && eventOptions.some((option) => selected.has(option)));
-const matchesFilterSelection = (event, selection) => matchesSelectedOptions(eventTags(event), selection.tags, availableTags)
-  && matchesSelectedOptions(eventHighlightTags(event), selection.highlights, availableHighlights);
+const matchesFilterSelection = (event, selection) => {
+  const tags = eventTags(event);
+  const matchesTags = tags.length ? matchesSelectedOptions(tags, selection.tags, availableTags)
+    : availableTags.every((tag) => HIDDEN_SCHOOL_TAGS.includes(tag) || selection.tags.has(tag));
+  return !tags.some((tag) => HIDDEN_SCHOOL_TAGS.includes(tag) && !selection.tags.has(tag))
+    && matchesTags
+    && matchesSelectedOptions(eventHighlightTags(event), selection.highlights, availableHighlights);
+};
 
 function refreshSelectionOptions(selection, options, kind) {
   const selected = selection[kind];
   const knownKey = kind === 'tags' ? 'knownTags' : 'knownHighlights';
   for (const value of selected) if (!options.includes(value)) selected.delete(value);
-  for (const value of options) if (!selection[knownKey].has(value)) selected.add(value);
+  for (const value of options) {
+    if (selection[knownKey].has(value)) continue;
+    if (kind === 'tags' && (!selection.selectNewTags || (HIDDEN_SCHOOL_TAGS.includes(value) && !selection.selectNewSchoolTags))) continue;
+    selected.add(value);
+  }
   selection[knownKey] = new Set(options);
 }
 
@@ -204,9 +251,14 @@ function renderFilterChoices(container, options, selected, kind, colors) {
 
 const selectionSummary = (selected, options, label) => !options.length || selected.size === options.length ? `All ${label}`
   : selected.size ? `${selected.size}/${options.length} ${label}` : `No ${label}`;
+const schoolNotice = (selection) => {
+  const hidden = HIDDEN_SCHOOL_TAGS.filter((tag) => !selection.tags.has(tag));
+  if (!hidden.length) return 'All Music, Dance and Theatre events shown';
+  return `Not shown: ${hidden.length === 1 ? hidden[0] : `${hidden.slice(0, -1).join(', ')} and ${hidden.at(-1)}`}`;
+};
 
 function renderFilters() {
-  availableTags = [...new Set(allEvents.flatMap(eventTags))].sort((a, b) => a.localeCompare(b));
+  availableTags = [...new Set([...allEvents.flatMap(eventTags), ...HIDDEN_SCHOOL_TAGS])].sort((a, b) => a.localeCompare(b));
   availableHighlights = [...new Set(allEvents.flatMap(eventHighlightTags))].sort((a, b) => a.localeCompare(b));
   for (const selection of [tileSelection, calendarSelection]) {
     refreshSelectionOptions(selection, availableTags, 'tags');
@@ -218,8 +270,8 @@ function renderFilters() {
   renderFilterChoices(calendarHighlightFilters, availableHighlights, calendarSelection.highlights, 'highlight', 'highlightTagColors');
   const timeLabel = { upcoming: 'Upcoming', past: 'Past events', all: 'All dates' }[activeTimeFilter];
   const summary = (selection) => `${selectionSummary(selection.tags, availableTags, 'tags')} · ${selectionSummary(selection.highlights, availableHighlights, 'highlights')}`;
-  filterSummary.textContent = `${timeLabel} · ${summary(tileSelection)}`;
-  calendarFilterSummary.textContent = `${summary(calendarSelection)}${filtersSynced ? ' · Synced' : ''}`;
+  filterSummary.textContent = `${timeLabel} · ${summary(tileSelection)} · ${schoolNotice(tileSelection)}`;
+  calendarFilterSummary.textContent = `${summary(calendarSelection)} · ${schoolNotice(calendarSelection)}${filtersSynced ? ' · Synced' : ''}`;
 }
 
 function relatedLinks(event) {
@@ -292,10 +344,16 @@ function changeSelection(surface, kind, action, value) {
   const options = kind === 'tag' ? availableTags : availableHighlights;
   const targets = filtersSynced ? [tileSelection, calendarSelection] : [surface === 'calendar' ? calendarSelection : tileSelection];
   for (const selection of targets) {
-    if (action === 'all') selection[key] = new Set(options);
-    else if (action === 'none') selection[key].clear();
-    else if (selection[key].has(value)) selection[key].delete(value);
-    else selection[key].add(value);
+    if (action === 'all') {
+      selection[key] = new Set(options);
+      if (key === 'tags') { selection.selectNewTags = true; selection.selectNewSchoolTags = true; }
+    } else if (action === 'none') {
+      selection[key].clear();
+      if (key === 'tags') { selection.selectNewTags = false; selection.selectNewSchoolTags = false; }
+    } else if (selection[key].has(value)) {
+      selection[key].delete(value);
+      if (key === 'tags' && HIDDEN_SCHOOL_TAGS.includes(value)) selection.selectNewSchoolTags = false;
+    } else selection[key].add(value);
   }
   renderFilters();
   render();
@@ -319,6 +377,8 @@ document.querySelector('#sync-filters').addEventListener('change', (change) => {
   if (filtersSynced) {
     tileSelection.tags = new Set(calendarSelection.tags);
     tileSelection.highlights = new Set(calendarSelection.highlights);
+    tileSelection.selectNewTags = calendarSelection.selectNewTags;
+    tileSelection.selectNewSchoolTags = calendarSelection.selectNewSchoolTags;
   }
   renderFilters();
   render();

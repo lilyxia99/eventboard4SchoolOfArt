@@ -33,7 +33,7 @@
           <div class="month-actions"><button type="button" id="month-today">Today</button><button type="button" id="month-prev" aria-label="Previous month">←</button><button type="button" id="month-next" aria-label="Next month">→</button></div>
         </div>
         <details class="filter-panel calendar-filter-panel" id="calendar-filter-panel">
-          <summary>Filter calendar <span id="calendar-filter-summary">All tags · All highlights</span></summary>
+          <summary>Filter calendar <span id="calendar-filter-summary" aria-live="polite">Loading filters…</span></summary>
           <label class="filter-sync"><input type="checkbox" id="sync-filters" checked /> Sync these filters with event tiles below</label>
           <div class="filter-group-heading"><p class="filter-label">Tags</p><div class="filter-actions"><button type="button" data-filter-action="all" data-filter-kind="tag" data-filter-surface="calendar">Select all</button><button type="button" data-filter-action="none" data-filter-kind="tag" data-filter-surface="calendar">Deselect all</button></div></div>
           <div class="filters" id="calendar-tag-filters" role="group" aria-label="Filter calendar by tag"></div>
@@ -50,7 +50,7 @@
           <p class="update-note"><span aria-hidden="true">✳</span> Updated as events are approved</p>
         </div>
         <details class="filter-panel" id="filter-panel">
-          <summary>Filter events <span id="filter-summary">Upcoming · All tags · All highlights</span></summary>
+          <summary>Filter events <span id="filter-summary" aria-live="polite">Loading filters…</span></summary>
           <p class="filter-label">When</p>
           <div class="filters" id="time-filters" role="group" aria-label="Filter events by time">
             <button type="button" class="filter-button is-active" data-time="upcoming" aria-pressed="true">Upcoming</button>
