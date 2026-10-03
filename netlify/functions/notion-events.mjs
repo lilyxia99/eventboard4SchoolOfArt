@@ -47,6 +47,10 @@ export function toPublicEvent(page, sourcePage) {
   const title = richText(properties['Name of the event']?.title) || 'Untitled event';
   const date = properties.Date?.date;
   const types = properties.Type?.multi_select?.map((option) => option.name) || [];
+  const tags = [...new Set([
+    ...(properties.Tags?.multi_select || properties.Tag?.multi_select || []).map((option) => option.name),
+    ...types,
+  ].map((name) => String(name || '').trim()).filter(Boolean))];
   const type = types.find((value) => ['Exhibition', 'Workshop', 'Screening', 'Lecture', 'Visiting Artist'].includes(value)) || types[0] || 'Other';
   const category = ['Exhibition', 'Workshop'].includes(type) ? type : type === 'Lecture' || type === 'Visiting Artist' ? 'Talk' : 'Other';
   const description = richText(properties['Published description']?.rich_text)
@@ -57,7 +61,7 @@ export function toPublicEvent(page, sourcePage) {
     || properties['Location (1)']?.place?.name
     || properties['Location (1)']?.place?.address
     || '';
-  const event = { id: page.id, title, category, type, date: date?.start?.slice(0, 10) || '', start: date?.start || '', end: date?.end || '', time: '', location, description };
+  const event = { id: page.id, title, category, type, tags, date: date?.start?.slice(0, 10) || '', start: date?.start || '', end: date?.end || '', time: '', location, description };
   if (date?.end) event.endDate = date.end.slice(0, 10);
   if (date?.start?.includes('T')) {
     const start = new Date(date.start);

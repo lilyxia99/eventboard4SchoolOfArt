@@ -1,8 +1,9 @@
 const grid = document.querySelector('#event-grid');
-const filterButtons = [...document.querySelectorAll('.filter-button')];
+const tagFilters = document.querySelector('#tag-filters');
+const filterSummary = document.querySelector('#filter-summary');
 let allEvents = [];
 let visibleEvents = [];
-let activeFilter = 'all';
+const selectedTags = new Set();
 let calendarEvents = [];
 let currentEventId = '';
 let lastEventSignature = '';
@@ -114,10 +115,10 @@ function downloadICS(event) {
 }
 
 function render() {
-  const events = allEvents.filter((event) => activeFilter === 'all' || event.category === activeFilter);
+  const events = allEvents.filter((event) => !selectedTags.size || [...selectedTags].some((tag) => eventTags(event).includes(tag)));
   visibleEvents = events;
   if (!events.length) {
-    const message = allEvents.length ? 'Nothing in this category just yet. Try another filter.' : 'No events are listed right now. Check back soon, or share something happening in our community.';
+    const message = allEvents.length ? 'No events match these tags. Try another filter.' : 'No events are listed right now. Check back soon, or share something happening in our community.';
     grid.innerHTML = `<p class="empty-state">${escapeHTML(message)}</p>`;
     return;
   }
@@ -134,6 +135,14 @@ function render() {
       <div class="event-details"><span>${escapeHTML(event.time || '')}</span><span class="event-location">${escapeHTML(event.location || '')}</span>${eventLink ? `<a class="card-event-link" href="${escapeHTML(eventLink)}" target="_blank" rel="noopener noreferrer">Event link ↗</a>` : ''}<span class="card-open-hint">View full details ↗</span></div>
     </article>`;
   }).join('');
+}
+
+const eventTags = (event) => [...new Set((Array.isArray(event.tags) && event.tags.length ? event.tags : [event.type || event.category]).map((tag) => String(tag || '').trim()).filter(Boolean))];
+function renderFilters() {
+  const tags = [...new Set(allEvents.flatMap(eventTags))].sort((a, b) => a.localeCompare(b));
+  for (const selected of selectedTags) if (!tags.includes(selected)) selectedTags.delete(selected);
+  tagFilters.innerHTML = `<button type="button" class="filter-button${selectedTags.size ? '' : ' is-active'}" data-tag-all aria-pressed="${!selectedTags.size}">All events</button>${tags.map((tag) => `<button type="button" class="filter-button${selectedTags.has(tag) ? ' is-active' : ''}" data-tag="${escapeHTML(tag)}" aria-pressed="${selectedTags.has(tag)}">${escapeHTML(tag)}</button>`).join('')}`;
+  filterSummary.textContent = selectedTags.size ? `${selectedTags.size} selected` : 'All events';
 }
 
 function relatedLinks(event) {
@@ -154,6 +163,7 @@ function openEvent(event) {
     ${poster ? `<button class="event-dialog-poster" type="button" aria-label="Enlarge poster for ${escapeHTML(event.title)}"><img src="${escapeHTML(poster)}" alt="${escapeHTML(event.posterAlt || `Poster for ${event.title}`)}"></button>` : ''}
     <div class="event-dialog-copy"><p class="event-dialog-category">${escapeHTML(event.type || event.category || 'Event')} · ${escapeHTML(date)}</p>
       <h2 id="event-dialog-title">${escapeHTML(event.title)}</h2>
+      ${eventTags(event).length ? `<div class="event-dialog-tags" aria-label="Event tags">${eventTags(event).map((tag) => `<span class="event-tag">${escapeHTML(tag)}</span>`).join('')}</div>` : ''}
       <dl class="event-dialog-facts"><div><dt>When</dt><dd>${escapeHTML(date)}</dd></div><div><dt>Where</dt><dd>${escapeHTML(event.location || 'See event details')}</dd></div></dl>
       <p class="event-dialog-description">${escapeHTML(event.description || '')}</p>${relatedLinks(event)}
       <button class="download-ics" type="button" ${event.start ? '' : 'disabled title="Add a date in Notion to enable download"'}>Download .ics</button>
@@ -199,11 +209,15 @@ document.querySelector('#month-prev').addEventListener('click', () => { selected
 document.querySelector('#month-next').addEventListener('click', () => { selectedMonth.setMonth(selectedMonth.getMonth() + 1); renderMonth(); });
 document.querySelector('#month-today').addEventListener('click', () => { selectedMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); renderMonth(); });
 
-filterButtons.forEach((button) => button.addEventListener('click', () => {
-  activeFilter = button.dataset.filter;
-  filterButtons.forEach((item) => { const selected = item === button; item.classList.toggle('is-active', selected); item.setAttribute('aria-pressed', String(selected)); });
+tagFilters.addEventListener('click', (click) => {
+  const button = click.target.closest('button');
+  if (!button) return;
+  if (button.hasAttribute('data-tag-all')) selectedTags.clear();
+  else if (selectedTags.has(button.dataset.tag)) selectedTags.delete(button.dataset.tag);
+  else selectedTags.add(button.dataset.tag);
+  renderFilters();
   render();
-}));
+});
 
 async function refreshEvents() {
   if (refreshingEvents) return;
@@ -219,6 +233,7 @@ async function refreshEvents() {
       allEvents = events;
       calendarEvents = events.filter((event) => event.start).map(toMonthEvent);
       lastEventSignature = signature;
+      renderFilters();
       render();
       renderMonth();
       if (eventDialog.open && currentEventId) {

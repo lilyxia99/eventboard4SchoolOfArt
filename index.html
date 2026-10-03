@@ -19,7 +19,7 @@
         <span class="wordmark-seal" aria-hidden="true">A</span>
         <span>UNC Greensboro <b>School of Art</b></span>
       </a>
-      <a class="submit-link" id="submit-link" href="#submit">Submit an event <span aria-hidden="true">↗</span></a>
+      <nav class="header-actions" aria-label="Site actions"><a href="#newsletter">Newsletter</a><a class="submit-link" id="submit-link" href="#submit">Submit an event <span aria-hidden="true">↗</span></a></nav>
     </header>
 
     <main>
@@ -41,17 +41,30 @@
           <div><p class="eyebrow">The public calendar</p><h2 id="events-title">Events</h2></div>
           <p class="update-note"><span aria-hidden="true">✳</span> Updated as events are approved</p>
         </div>
-        <div class="filters" role="group" aria-label="Filter events by type">
-          <button class="filter-button is-active" data-filter="all" aria-pressed="true">All events</button>
-          <button class="filter-button" data-filter="Exhibition" aria-pressed="false">Exhibitions</button>
-          <button class="filter-button" data-filter="Talk" aria-pressed="false">Talks</button>
-          <button class="filter-button" data-filter="Workshop" aria-pressed="false">Workshops</button>
-          <button class="filter-button" data-filter="Other" aria-pressed="false">More</button>
-        </div>
+        <details class="filter-panel" id="filter-panel">
+          <summary>Filter by tag <span id="filter-summary">All events</span></summary>
+          <div class="filters" id="tag-filters" role="group" aria-label="Filter events by tag"></div>
+        </details>
         <div class="event-grid" id="event-grid" aria-live="polite" aria-busy="true">
           <p class="loading-state">Gathering what's happening…</p>
         </div>
         <p class="calendar-footnote">Have an event to share? <a id="footer-submit-link" href="#submit">Send it our way <span aria-hidden="true">↗</span></a></p>
+      </section>
+
+      <section class="newsletter-section" id="newsletter" aria-labelledby="newsletter-title">
+        <div>
+          <p class="eyebrow">A weekly note</p>
+          <h2 id="newsletter-title">School of Art events in your inbox</h2>
+          <p>Get an unofficial weekly summary of upcoming events. We use your email only for this newsletter. You can unsubscribe by replying to any issue.</p>
+        </div>
+        <form class="newsletter-form" name="eventboard-newsletter" method="POST" action="/newsletter-thanks" data-netlify="true" netlify-honeypot="bot-field">
+          <input type="hidden" name="form-name" value="eventboard-newsletter" />
+          <p class="honeypot"><label>Leave this field empty <input name="bot-field" tabindex="-1" autocomplete="off" /></label></p>
+          <label for="newsletter-email">Email address</label>
+          <div class="newsletter-controls"><input id="newsletter-email" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="you@example.com" /><button type="submit">Sign up for newsletter</button></div>
+          <label class="newsletter-consent"><input type="checkbox" name="consent" value="weekly-event-email" required /> I agree to receive the weekly School of Art event email.</label>
+          <p class="newsletter-privacy">Your address is stored privately with our website provider and is never shown on this site.</p>
+        </form>
       </section>
     </main>
 
