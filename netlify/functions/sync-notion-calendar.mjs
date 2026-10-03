@@ -5,7 +5,7 @@ import { createNotionEvent, getSyncNotionPages, toPublicEvent, updateNotionPage,
 const CALENDAR_ID = 'f9986b287c7b91dce74e53673364bfc7247a882a399a55b4a7027a752d5a6299@group.calendar.google.com';
 const API = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events`;
 const SOURCE = 'uncg-school-of-art-eventboard';
-const SITE = 'https://uncg-school-of-art-eventboard.netlify.app';
+const SITE = 'https://uncg-event.com';
 const base64url = (value) => Buffer.from(value).toString('base64url');
 
 function exclusiveEnd(date) {
@@ -125,7 +125,7 @@ function descriptionLinks(description) {
     } catch { return false; }
   });
   const image = safe.find((url) => /\.(?:png|jpe?g|webp|gif)(?:[?#]|$)/i.test(url));
-  const website = safe.find((url) => url !== image && !url.includes('uncg-school-of-art-eventboard.netlify.app'));
+  const website = safe.find((url) => url !== image && !['uncg-event.com', 'www.uncg-event.com', 'uncg-school-of-art-eventboard.netlify.app'].includes(new URL(url).hostname.toLowerCase()));
   return { image, website };
 }
 

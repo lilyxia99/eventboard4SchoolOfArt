@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-The production site is [uncg-school-of-art-eventboard.netlify.app](https://uncg-school-of-art-eventboard.netlify.app/). Its source is the GitHub `main` branch.
+The production site is [uncg-event.com](https://uncg-event.com/). Its source is the GitHub `main` branch.
 
 ## Legacy Tally form (inactive)
 
