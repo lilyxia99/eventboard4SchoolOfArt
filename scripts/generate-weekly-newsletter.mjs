@@ -42,6 +42,18 @@ function safeUrl(value) {
 
 const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 const cleanText = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+function linkifyText(value) {
+  return String(value || '').split(/(https?:\/\/[^\s<>"']+)/gi).map((part) => {
+    if (!/^https?:\/\//i.test(part)) return escapeHtml(part);
+    const suffix = part.match(/[.,;!?]+$/)?.[0] || '';
+    const url = part.slice(0, part.length - suffix.length);
+    try {
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) return escapeHtml(part);
+      return `<a href="${escapeHtml(parsed.href)}" style="color:#273eaa;text-decoration:underline">${escapeHtml(url)}</a>${escapeHtml(suffix)}`;
+    } catch { return escapeHtml(part); }
+  }).join('');
+}
 
 function eventDays(event) {
   const start = event.start || event.date;
@@ -96,7 +108,7 @@ function renderText(issue) {
 }
 
 function renderHtml(issue, email = false) {
-  const cards = issue.events.map((event) => `<section style="padding:28px 0;border-top:1px solid #d4d0c7"><h2 style="font:700 30px/1.2 Arial,sans-serif;color:#c62d27;margin:0 0 14px">${escapeHtml(event.title)}</h2><p style="margin:0 0 14px"><strong><u>${escapeHtml(event.when)}</u></strong><br><strong><u>${escapeHtml(event.location || 'Location to be announced')}</u></strong></p>${event.description ? `<p>${escapeHtml(event.description)}</p>` : ''}${event.poster ? `<p><img src="${escapeHtml(email ? event.poster.publicUrl : event.poster.fileName)}" alt="${escapeHtml(event.poster.alt)}" style="display:block;max-width:100%;width:360px;height:auto"></p>` : ''}<p><a href="${escapeHtml(event.pageUrl)}" style="color:#273eaa;text-decoration:underline">View event details</a>${event.eventUrl ? ` · <a href="${escapeHtml(event.eventUrl)}" style="color:#273eaa;text-decoration:underline">Event link</a>` : ''}</p>${event.tags.length ? `<p style="font-style:italic;color:#55564f;text-align:right;margin:16px 0 0">${escapeHtml(event.tags.join(' · '))}</p>` : ''}</section>`).join('');
+  const cards = issue.events.map((event) => `<section style="padding:28px 0;border-top:1px solid #d4d0c7"><h2 style="font:700 30px/1.2 Arial,sans-serif;color:#c62d27;margin:0 0 14px">${escapeHtml(event.title)}</h2><p style="margin:0 0 14px"><strong><u>${escapeHtml(event.when)}</u></strong><br><strong><u>${escapeHtml(event.location || 'Location to be announced')}</u></strong></p>${event.description ? `<p>${linkifyText(event.description)}</p>` : ''}${event.poster ? `<p><img src="${escapeHtml(email ? event.poster.publicUrl : event.poster.fileName)}" alt="${escapeHtml(event.poster.alt)}" style="display:block;max-width:100%;width:360px;height:auto"></p>` : ''}<p><a href="${escapeHtml(event.pageUrl)}" style="color:#273eaa;text-decoration:underline">View event details</a>${event.eventUrl ? ` · <a href="${escapeHtml(event.eventUrl)}" style="color:#273eaa;text-decoration:underline">Event link</a>` : ''}</p>${event.tags.length ? `<p style="font-style:italic;color:#55564f;text-align:right;margin:16px 0 0">${escapeHtml(event.tags.join(' · '))}</p>` : ''}</section>`).join('');
   return `<!doctype html><html lang="en"><meta charset="utf-8"><title>${escapeHtml(issue.subject)}</title><body style="font:16px/1.55 Arial,sans-serif;color:#181916;max-width:640px;margin:24px auto;padding:0 16px"><p><img src="${SITE}/uncg-event-logo.png" alt="UNCG SoA Eventboard logo" width="240" style="display:block;max-width:100%;height:auto"></p><h1 style="font:700 34px/1.2 Arial,sans-serif;margin:16px 0 8px">UNCG School of Art Eventboard</h1><p style="font-size:18px;margin:0 0 24px">Events for ${escapeHtml(issue.label)} · Times are Eastern</p>${cards}<footer style="border-top:1px solid #d4d0c7;font-size:14px;padding-top:20px"><p>You are receiving this because you subscribed to the School of Art Eventboard weekly email.</p><p><a href="${SITE}/unsubscribe">Unsubscribe</a> or reply with “unsubscribe” in the subject.</p><p>Leilei Xia · Gatewood Studio Arts Building · 527 Highland Ave. · Greensboro, NC 27412</p></footer></body></html>`;
 }
 
