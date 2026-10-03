@@ -58,6 +58,14 @@ The importer looks for an image attachment or a direct HTTPS image URL in the Go
 
 The existing `GOOGLE_CALENDAR_API` is an API key for reading the public calendar; it cannot authorize writes. The local Codex automation reviews submissions daily at 8:00 a.m. Eastern Time, then runs `node --env-file=.env scripts/run-notion-calendar-sync.mjs` using the service-account JSON in the ignored local `.env`. It needs this computer and Codex's local scheduler to be running. The service account has event-edit access to this calendar. The Netlify scheduled function skips safely if `GOOGLE_SERVICE_ACCOUNT_JSON` is absent. Do not commit either credential.
 
+## Weekly newsletter
+
+The Monday Codex task generates the coming Monday–Sunday issue from the live `Done` Notion event feed with `node scripts/generate-weekly-newsletter.mjs`. It downloads each current Notion poster to the ignored `.codex-newsletter/<Monday>/` directory and creates a text issue, HTML preview, and structured issue file. Dated events in that week are included; undated events are omitted because they have no week to assign. A failed feed or expected poster download stops the send.
+
+Before sending, the task reads all Netlify `eventboard-newsletter` and `eventboard-newsletter-unsubscribe` submissions, honors the latest opt-out for each address, checks unsubscribe replies in Mail, and writes active addresses to an ignored local recipient file. It then runs `node scripts/send-weekly-newsletter.mjs --week=YYYY-MM-DD --recipients=<ignored-file> --send`. This program composes in Apple Mail from `l_xia@uncg.edu`, addresses the sender in To, puts subscribers only in Bcc, and inserts each Notion poster below its event. Omit `--send` to create a draft. `--test` marks and tracks a separate one-recipient test issue. The ignored `.codex-newsletter-state.json` prevents a repeat send; if it says `pending`, inspect Mail's Sent mailbox before any retry. Subscriber addresses and issue drafts stay outside Git.
+
+Every issue includes the public unsubscribe form and a reply option. Check both sources before each weekly send. The task must stay quiet if there are no events or active subscribers, and must report a failed send instead of retrying blindly.
+
 ## Local Notion sync and legacy review
 
 The form ID is `dWBvdK`. For local Codex reviews, keep `TALLY_API_KEY` in the ignored local `.env` file or save it in macOS Keychain with `bash scripts/store-tally-api-key.sh`. Netlify masks secret values when they are read back, so a key saved only in Netlify cannot be used by the local scheduled task. Never commit `.env`.

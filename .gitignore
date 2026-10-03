@@ -6,3 +6,5 @@ dist/
 !.env.example
 .DS_Store
 .codex-review-state.json
+.codex-newsletter/
+.codex-newsletter-state.json
