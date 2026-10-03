@@ -32,6 +32,14 @@
           <h2 id="month-title" aria-live="polite"></h2>
           <div class="month-actions"><button type="button" id="month-today">Today</button><button type="button" id="month-prev" aria-label="Previous month">←</button><button type="button" id="month-next" aria-label="Next month">→</button></div>
         </div>
+        <details class="filter-panel calendar-filter-panel" id="calendar-filter-panel">
+          <summary>Filter calendar <span id="calendar-filter-summary">All tags · All highlights</span></summary>
+          <label class="filter-sync"><input type="checkbox" id="sync-filters" checked /> Sync these filters with event tiles below</label>
+          <div class="filter-group-heading"><p class="filter-label">Tags</p><div class="filter-actions"><button type="button" data-filter-action="all" data-filter-kind="tag" data-filter-surface="calendar">Select all</button><button type="button" data-filter-action="none" data-filter-kind="tag" data-filter-surface="calendar">Deselect all</button></div></div>
+          <div class="filters" id="calendar-tag-filters" role="group" aria-label="Filter calendar by tag"></div>
+          <div class="filter-group-heading"><p class="filter-label">Highlights</p><div class="filter-actions"><button type="button" data-filter-action="all" data-filter-kind="highlight" data-filter-surface="calendar">Select all</button><button type="button" data-filter-action="none" data-filter-kind="highlight" data-filter-surface="calendar">Deselect all</button></div></div>
+          <div class="filters" id="calendar-highlight-filters" role="group" aria-label="Filter calendar by highlight"></div>
+        </details>
         <div class="month-calendar" id="month-calendar" aria-label="Published events month view" aria-busy="true"></div>
         <p class="month-note" id="month-note" role="status">Loading events…</p>
       </section>
@@ -42,16 +50,16 @@
           <p class="update-note"><span aria-hidden="true">✳</span> Updated as events are approved</p>
         </div>
         <details class="filter-panel" id="filter-panel">
-          <summary>Filter events <span id="filter-summary">Upcoming · All tags</span></summary>
+          <summary>Filter events <span id="filter-summary">Upcoming · All tags · All highlights</span></summary>
           <p class="filter-label">When</p>
           <div class="filters" id="time-filters" role="group" aria-label="Filter events by time">
             <button type="button" class="filter-button is-active" data-time="upcoming" aria-pressed="true">Upcoming</button>
             <button type="button" class="filter-button" data-time="past" aria-pressed="false">Past events</button>
             <button type="button" class="filter-button" data-time="all" aria-pressed="false">All dates</button>
           </div>
-          <p class="filter-label">Tags</p>
+          <div class="filter-group-heading"><p class="filter-label">Tags</p><div class="filter-actions"><button type="button" data-filter-action="all" data-filter-kind="tag" data-filter-surface="tiles">Select all</button><button type="button" data-filter-action="none" data-filter-kind="tag" data-filter-surface="tiles">Deselect all</button></div></div>
           <div class="filters" id="tag-filters" role="group" aria-label="Filter events by tag"></div>
-          <p class="filter-label">Highlight tags</p>
+          <div class="filter-group-heading"><p class="filter-label">Highlights</p><div class="filter-actions"><button type="button" data-filter-action="all" data-filter-kind="highlight" data-filter-surface="tiles">Select all</button><button type="button" data-filter-action="none" data-filter-kind="highlight" data-filter-surface="tiles">Deselect all</button></div></div>
           <div class="filters" id="highlight-filters" role="group" aria-label="Filter events by highlight tag"></div>
         </details>
         <div class="event-grid" id="event-grid" aria-live="polite" aria-busy="true">

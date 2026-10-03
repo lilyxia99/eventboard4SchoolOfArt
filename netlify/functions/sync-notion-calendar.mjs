@@ -7,6 +7,11 @@ const API = `https://www.googleapis.com/calendar/v3/calendars/${encodeURICompone
 const SOURCE = 'uncg-school-of-art-eventboard';
 const SITE = 'https://uncg-event.com';
 const base64url = (value) => Buffer.from(value).toString('base64url');
+const GOOGLE_EVENT_COLOR_BY_NOTION_COLOR = {
+  default: '8', gray: '8', brown: '6', orange: '6', yellow: '5', green: '10',
+  blue: '9', purple: '3', pink: '4', red: '11',
+};
+const googleColorId = (event) => GOOGLE_EVENT_COLOR_BY_NOTION_COLOR[event.tagColors?.[event.tags[0]]];
 
 function exclusiveEnd(date) {
   const day = new Date(`${date}T12:00:00Z`);
@@ -72,7 +77,8 @@ function googleEvent(page) {
   const reference = unique?.number ? `Notion ID: ${unique.prefix || ''}${unique.number}` : '';
   const siteUrl = `${SITE}/#event-${page.id}`;
   const description = [event.description, event.eventUrl, reference, `View on Eventboard: ${siteUrl}`].filter(Boolean).join('\n\n');
-  return { id, summary: event.title, description, location: event.location, start, end, extendedProperties: { private: { source: SOURCE, notionPageId: page.id } } };
+  const colorId = googleColorId(event);
+  return { id, summary: event.title, description, location: event.location, start, end, ...(colorId ? { colorId } : {}), extendedProperties: { private: { source: SOURCE, notionPageId: page.id } } };
 }
 
 async function managedEvents(token) {
@@ -215,8 +221,9 @@ function notionChangesForGoogle(page, event) {
     : { dateTime: published.end?.includes('T') ? published.end : new Date(new Date(published.start).getTime() + 3600000).toISOString(), timeZone: 'America/New_York' };
   const description = published.eventUrl && !published.description.includes(published.eventUrl)
     ? [published.description, published.eventUrl].filter(Boolean).join('\n\n') : published.description;
-  const desired = { summary: published.title, description, location: published.location, start, end };
-  return comparable(desired) === comparable(event) ? null : desired;
+  const colorId = googleColorId(published);
+  const desired = { summary: published.title, description, location: published.location, start, end, ...(colorId ? { colorId } : {}) };
+  return comparable(desired) === comparable(event) && (!colorId || colorId === event.colorId) ? null : desired;
 }
 
 function comparable(event) {
@@ -271,7 +278,8 @@ export async function syncCalendar() {
     if (!existing.has(id)) {
       saved = await googleRequest(API, token, 'POST', event);
       counts.created += 1;
-    } else if (comparable(existing.get(id)) !== comparable(event)) {
+    } else if (comparable(existing.get(id)) !== comparable(event)
+      || (existing.get(id).colorId || '') !== (event.colorId || '')) {
       saved = await googleRequest(`${API}/${id}`, token, 'PUT', event);
       counts.updated += 1;
     } else saved = existing.get(id);

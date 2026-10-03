@@ -1,12 +1,19 @@
 const grid = document.querySelector('#event-grid');
 const tagFilters = document.querySelector('#tag-filters');
 const highlightFilters = document.querySelector('#highlight-filters');
+const calendarTagFilters = document.querySelector('#calendar-tag-filters');
+const calendarHighlightFilters = document.querySelector('#calendar-highlight-filters');
 const timeFilters = document.querySelector('#time-filters');
 const filterSummary = document.querySelector('#filter-summary');
+const calendarFilterSummary = document.querySelector('#calendar-filter-summary');
 let allEvents = [];
 let visibleEvents = [];
-const selectedTags = new Set();
-const selectedHighlights = new Set();
+const newFilterSelection = () => ({ tags: new Set(), highlights: new Set(), knownTags: new Set(), knownHighlights: new Set() });
+const tileSelection = newFilterSelection();
+const calendarSelection = newFilterSelection();
+let filtersSynced = true;
+let availableTags = [];
+let availableHighlights = [];
 let activeTimeFilter = 'upcoming';
 let calendarEvents = [];
 let currentEventId = '';
@@ -83,6 +90,8 @@ const eventWhen = (event) => {
 
 function renderMonth() {
   monthTitle.textContent = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(selectedMonth);
+  const filteredEvents = calendarEvents.map((event, index) => ({ event, index }))
+    .filter(({ event }) => matchesFilterSelection(event, calendarSelection));
   const first = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
   const gridStart = new Date(first);
   gridStart.setDate(1 - first.getDay());
@@ -93,15 +102,20 @@ function renderMonth() {
     const day = new Date(gridStart);
     day.setDate(gridStart.getDate() + offset);
     const key = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
-    const matches = calendarEvents.map((event, index) => ({ event, index })).filter(({ event }) => {
+    const matches = filteredEvents.filter(({ event }) => {
       const start = localDay(event.start);
       const end = event.allDay ? localDay(event.end) : localDay(new Date(new Date(event.end).getTime() - 1).toISOString());
       return key >= start && key <= (event.allDay ? localDay(new Date(new Date(`${end}T12:00:00Z`).getTime() - 86400000).toISOString()) : end);
     });
-    const buttons = matches.map(({ event, index }) => `<button type="button" class="month-event" data-calendar-index="${index}" aria-label="${escapeHTML(event.title)}, ${escapeHTML(eventWhen(event))}"><span class="month-event-time">${escapeHTML(calendarTime(event))}</span> ${escapeHTML(event.title)}</button>`).join('');
+    const buttons = matches.map(({ event, index }) => {
+      const firstTag = eventTags(event)[0];
+      return `<button type="button" class="month-event${tagColorClass(event.tagColors?.[firstTag])}" data-calendar-index="${index}" aria-label="${escapeHTML(event.title)}, ${escapeHTML(eventWhen(event))}"><span class="month-event-time">${escapeHTML(calendarTime(event))}</span> ${escapeHTML(event.title)}</button>`;
+    }).join('');
     return `<div class="month-day${day.getMonth() === selectedMonth.getMonth() ? '' : ' is-outside'}${key === localDay(new Date().toISOString()) ? ' is-today' : ''}"><span class="month-day-number">${day.getDate()}</span>${buttons}</div>`;
   }).join('');
   monthCalendar.innerHTML = weekdays + days;
+  monthNote.textContent = !calendarEvents.length ? 'No dated events are published yet.'
+    : !filteredEvents.length ? 'No events match the calendar filters.' : 'Times shown in Eastern Time.';
 }
 
 const icsEscape = (value) => String(value || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
@@ -139,9 +153,7 @@ function render() {
   const events = allEvents.filter((event) => {
     const past = isPastEvent(event, now);
     const matchesTime = activeTimeFilter === 'all' || (activeTimeFilter === 'past' ? past : !past);
-    return matchesTime
-      && (!selectedTags.size || [...selectedTags].some((tag) => eventTags(event).includes(tag)))
-      && (!selectedHighlights.size || [...selectedHighlights].some((tag) => eventHighlightTags(event).includes(tag)));
+    return matchesTime && matchesFilterSelection(event, tileSelection);
   });
   visibleEvents = events;
   if (!events.length) {
@@ -169,23 +181,45 @@ function render() {
 const eventTags = (event) => [...new Set((Array.isArray(event.tags) && event.tags.length ? event.tags : [event.type || event.category]).map((tag) => String(tag || '').trim()).filter(Boolean))];
 const eventHighlightTags = (event) => [...new Set((Array.isArray(event.highlightTags) ? event.highlightTags : []).map((tag) => String(tag || '').trim()).filter(Boolean))];
 const highlightTagMarkup = (event, tag) => `<span class="event-tag highlight-tag${tagColorClass(event.highlightTagColors?.[tag])}">${escapeHTML(tag)}</span>`;
+const matchesSelectedOptions = (eventOptions, selected, available) => !available.length || selected.size === available.length
+  || (selected.size > 0 && eventOptions.some((option) => selected.has(option)));
+const matchesFilterSelection = (event, selection) => matchesSelectedOptions(eventTags(event), selection.tags, availableTags)
+  && matchesSelectedOptions(eventHighlightTags(event), selection.highlights, availableHighlights);
+
+function refreshSelectionOptions(selection, options, kind) {
+  const selected = selection[kind];
+  const knownKey = kind === 'tags' ? 'knownTags' : 'knownHighlights';
+  for (const value of selected) if (!options.includes(value)) selected.delete(value);
+  for (const value of options) if (!selection[knownKey].has(value)) selected.add(value);
+  selection[knownKey] = new Set(options);
+}
+
+function renderFilterChoices(container, options, selected, kind, colors) {
+  container.innerHTML = options.map((option) => {
+    const color = allEvents.find((event) => event[colors]?.[option])?.[colors]?.[option];
+    const active = selected.has(option);
+    return `<button type="button" class="filter-button filter-chip${tagColorClass(color)}${active ? ' is-active' : ''}" data-${kind}="${escapeHTML(option)}" aria-pressed="${active}">${escapeHTML(option)}</button>`;
+  }).join('');
+}
+
+const selectionSummary = (selected, options, label) => !options.length || selected.size === options.length ? `All ${label}`
+  : selected.size ? `${selected.size}/${options.length} ${label}` : `No ${label}`;
+
 function renderFilters() {
-  const tags = [...new Set(allEvents.flatMap(eventTags))].sort((a, b) => a.localeCompare(b));
-  for (const selected of selectedTags) if (!tags.includes(selected)) selectedTags.delete(selected);
-  const highlights = [...new Set(allEvents.flatMap(eventHighlightTags))].sort((a, b) => a.localeCompare(b));
-  for (const selected of selectedHighlights) if (!highlights.includes(selected)) selectedHighlights.delete(selected);
-  tagFilters.innerHTML = `<button type="button" class="filter-button${selectedTags.size ? '' : ' is-active'}" data-tag-all aria-pressed="${!selectedTags.size}">All tags</button>${tags.map((tag) => {
-    const color = allEvents.find((event) => event.tagColors?.[tag])?.tagColors[tag];
-    return `<button type="button" class="filter-button${tagColorClass(color)}${selectedTags.has(tag) ? ' is-active' : ''}" data-tag="${escapeHTML(tag)}" aria-pressed="${selectedTags.has(tag)}">${escapeHTML(tag)}</button>`;
-  }).join('')}`;
-  highlightFilters.innerHTML = `<button type="button" class="filter-button${selectedHighlights.size ? '' : ' is-active'}" data-highlight-all aria-pressed="${!selectedHighlights.size}">All highlights</button>${highlights.map((tag) => {
-    const color = allEvents.find((event) => event.highlightTagColors?.[tag])?.highlightTagColors[tag];
-    return `<button type="button" class="filter-button${tagColorClass(color)}${selectedHighlights.has(tag) ? ' is-active' : ''}" data-highlight="${escapeHTML(tag)}" aria-pressed="${selectedHighlights.has(tag)}">${escapeHTML(tag)}</button>`;
-  }).join('')}`;
+  availableTags = [...new Set(allEvents.flatMap(eventTags))].sort((a, b) => a.localeCompare(b));
+  availableHighlights = [...new Set(allEvents.flatMap(eventHighlightTags))].sort((a, b) => a.localeCompare(b));
+  for (const selection of [tileSelection, calendarSelection]) {
+    refreshSelectionOptions(selection, availableTags, 'tags');
+    refreshSelectionOptions(selection, availableHighlights, 'highlights');
+  }
+  renderFilterChoices(tagFilters, availableTags, tileSelection.tags, 'tag', 'tagColors');
+  renderFilterChoices(highlightFilters, availableHighlights, tileSelection.highlights, 'highlight', 'highlightTagColors');
+  renderFilterChoices(calendarTagFilters, availableTags, calendarSelection.tags, 'tag', 'tagColors');
+  renderFilterChoices(calendarHighlightFilters, availableHighlights, calendarSelection.highlights, 'highlight', 'highlightTagColors');
   const timeLabel = { upcoming: 'Upcoming', past: 'Past events', all: 'All dates' }[activeTimeFilter];
-  const tagSummary = selectedTags.size ? `${selectedTags.size} tags` : 'All tags';
-  const highlightSummary = selectedHighlights.size ? `${selectedHighlights.size} highlights` : 'All highlights';
-  filterSummary.textContent = `${timeLabel} · ${tagSummary} · ${highlightSummary}`;
+  const summary = (selection) => `${selectionSummary(selection.tags, availableTags, 'tags')} · ${selectionSummary(selection.highlights, availableHighlights, 'highlights')}`;
+  filterSummary.textContent = `${timeLabel} · ${summary(tileSelection)}`;
+  calendarFilterSummary.textContent = `${summary(calendarSelection)}${filtersSynced ? ' · Synced' : ''}`;
 }
 
 function relatedLinks(event) {
@@ -253,23 +287,42 @@ document.querySelector('#month-prev').addEventListener('click', () => { selected
 document.querySelector('#month-next').addEventListener('click', () => { selectedMonth.setMonth(selectedMonth.getMonth() + 1); renderMonth(); });
 document.querySelector('#month-today').addEventListener('click', () => { selectedMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1); renderMonth(); });
 
-tagFilters.addEventListener('click', (click) => {
-  const button = click.target.closest('button');
-  if (!button) return;
-  if (button.hasAttribute('data-tag-all')) selectedTags.clear();
-  else if (selectedTags.has(button.dataset.tag)) selectedTags.delete(button.dataset.tag);
-  else selectedTags.add(button.dataset.tag);
+function changeSelection(surface, kind, action, value) {
+  const key = kind === 'tag' ? 'tags' : 'highlights';
+  const options = kind === 'tag' ? availableTags : availableHighlights;
+  const targets = filtersSynced ? [tileSelection, calendarSelection] : [surface === 'calendar' ? calendarSelection : tileSelection];
+  for (const selection of targets) {
+    if (action === 'all') selection[key] = new Set(options);
+    else if (action === 'none') selection[key].clear();
+    else if (selection[key].has(value)) selection[key].delete(value);
+    else selection[key].add(value);
+  }
   renderFilters();
   render();
-});
-highlightFilters.addEventListener('click', (click) => {
-  const button = click.target.closest('button');
-  if (!button) return;
-  if (button.hasAttribute('data-highlight-all')) selectedHighlights.clear();
-  else if (selectedHighlights.has(button.dataset.highlight)) selectedHighlights.delete(button.dataset.highlight);
-  else selectedHighlights.add(button.dataset.highlight);
+  renderMonth();
+}
+
+for (const [container, surface, kind] of [
+  [tagFilters, 'tiles', 'tag'], [highlightFilters, 'tiles', 'highlight'],
+  [calendarTagFilters, 'calendar', 'tag'], [calendarHighlightFilters, 'calendar', 'highlight'],
+]) {
+  container.addEventListener('click', (click) => {
+    const button = click.target.closest(`[data-${kind}]`);
+    if (button) changeSelection(surface, kind, 'toggle', button.dataset[kind]);
+  });
+}
+document.querySelectorAll('[data-filter-action]').forEach((button) => button.addEventListener('click', () => {
+  changeSelection(button.dataset.filterSurface, button.dataset.filterKind, button.dataset.filterAction);
+}));
+document.querySelector('#sync-filters').addEventListener('change', (change) => {
+  filtersSynced = change.target.checked;
+  if (filtersSynced) {
+    tileSelection.tags = new Set(calendarSelection.tags);
+    tileSelection.highlights = new Set(calendarSelection.highlights);
+  }
   renderFilters();
   render();
+  renderMonth();
 });
 timeFilters.addEventListener('click', (click) => {
   const button = click.target.closest('[data-time]');
@@ -308,7 +361,6 @@ async function refreshEvents() {
       }
     } else render();
     hasLoadedEvents = true;
-    monthNote.textContent = calendarEvents.length ? 'Times shown in Eastern Time.' : 'No dated events are published yet.';
   } catch {
     if (!hasLoadedEvents) grid.innerHTML = '<p class="empty-state">The event list is temporarily unavailable. Please try again in a little while.</p>';
     monthNote.textContent = hasLoadedEvents ? 'Updates are temporarily unavailable; showing the last loaded events.' : 'The event list is temporarily unavailable.';
