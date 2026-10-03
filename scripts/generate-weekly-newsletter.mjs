@@ -84,19 +84,20 @@ async function posterFor(event, directory, index) {
 }
 
 function renderText(issue) {
-  const lines = [`UNCG School of Art Eventboard · ${issue.label}`, 'Unofficial weekly event summary · Times are Eastern', ''];
+  const lines = ['UNCG School of Art Eventboard', `Events for ${issue.label} · Times are Eastern`, ''];
   for (const event of issue.events) {
     lines.push(event.title, event.when, event.location || 'Location to be announced', event.description || '', `Event details: ${event.pageUrl}`);
     if (event.eventUrl) lines.push(`Event link: ${event.eventUrl}`);
+    if (event.tags.length) lines.push(`Tags: ${event.tags.join(' · ')}`);
     lines.push('');
   }
   lines.push('You are receiving this because you subscribed to the School of Art Eventboard weekly email.', `Unsubscribe: ${SITE}/unsubscribe`, 'Or reply with “unsubscribe” in the subject.', 'Leilei Xia · Gatewood Studio Arts Building · 527 Highland Ave. · Greensboro, NC 27412');
   return lines.join('\n');
 }
 
-function renderHtml(issue) {
-  const cards = issue.events.map((event) => `<section style="padding:20px 0;border-top:1px solid #cbd2dd"><h2 style="font-size:22px;margin:0 0 8px">${escapeHtml(event.title)}</h2><p><strong>${escapeHtml(event.when)}</strong><br>${escapeHtml(event.location || 'Location to be announced')}</p><p>${escapeHtml(event.description)}</p>${event.poster ? `<p><img src="${escapeHtml(event.poster.fileName)}" alt="${escapeHtml(event.poster.alt)}" style="display:block;max-width:100%;width:360px;height:auto"></p>` : ''}<p><a href="${escapeHtml(event.pageUrl)}">View event details</a>${event.eventUrl ? ` · <a href="${escapeHtml(event.eventUrl)}">Event link</a>` : ''}</p></section>`).join('');
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><title>${escapeHtml(issue.subject)}</title><body style="font:16px/1.55 Arial,sans-serif;color:#181916;max-width:640px;margin:24px auto;padding:0 16px"><p>UNCG School of Art Eventboard · Unofficial weekly event summary</p><h1>Events for ${escapeHtml(issue.label)}</h1><p>Times are Eastern.</p>${cards}<footer style="border-top:1px solid #cbd2dd;font-size:14px;padding-top:20px"><p>You are receiving this because you subscribed to the School of Art Eventboard weekly email.</p><p><a href="${SITE}/unsubscribe">Unsubscribe</a> or reply with “unsubscribe” in the subject.</p><p>Leilei Xia · Gatewood Studio Arts Building · 527 Highland Ave. · Greensboro, NC 27412</p></footer></body></html>`;
+function renderHtml(issue, email = false) {
+  const cards = issue.events.map((event) => `<section style="padding:28px 0;border-top:1px solid #d4d0c7"><h2 style="font:700 30px/1.2 Arial,sans-serif;color:#c62d27;margin:0 0 14px">${escapeHtml(event.title)}</h2><p style="margin:0 0 14px"><strong><u>${escapeHtml(event.when)}</u></strong><br><strong><u>${escapeHtml(event.location || 'Location to be announced')}</u></strong></p>${event.description ? `<p>${escapeHtml(event.description)}</p>` : ''}${event.poster ? `<p><img src="${escapeHtml(email ? event.poster.publicUrl : event.poster.fileName)}" alt="${escapeHtml(event.poster.alt)}" style="display:block;max-width:100%;width:360px;height:auto"></p>` : ''}<p><a href="${escapeHtml(event.pageUrl)}" style="color:#273eaa;text-decoration:underline">View event details</a>${event.eventUrl ? ` · <a href="${escapeHtml(event.eventUrl)}" style="color:#273eaa;text-decoration:underline">Event link</a>` : ''}</p>${event.tags.length ? `<p style="font-style:italic;color:#55564f;text-align:right;margin:16px 0 0">${escapeHtml(event.tags.join(' · '))}</p>` : ''}</section>`).join('');
+  return `<!doctype html><html lang="en"><meta charset="utf-8"><title>${escapeHtml(issue.subject)}</title><body style="font:16px/1.55 Arial,sans-serif;color:#181916;max-width:640px;margin:24px auto;padding:0 16px"><p><img src="${SITE}/uncg-event-logo.png" alt="UNCG SoA Eventboard logo" width="240" style="display:block;max-width:100%;height:auto"></p><h1 style="font:700 34px/1.2 Arial,sans-serif;margin:16px 0 8px">UNCG School of Art Eventboard</h1><p style="font-size:18px;margin:0 0 24px">Events for ${escapeHtml(issue.label)} · Times are Eastern</p>${cards}<footer style="border-top:1px solid #d4d0c7;font-size:14px;padding-top:20px"><p>You are receiving this because you subscribed to the School of Art Eventboard weekly email.</p><p><a href="${SITE}/unsubscribe">Unsubscribe</a> or reply with “unsubscribe” in the subject.</p><p>Leilei Xia · Gatewood Studio Arts Building · 527 Highland Ave. · Greensboro, NC 27412</p></footer></body></html>`;
 }
 
 const monday = weekStart();
@@ -111,17 +112,26 @@ const selected = payload.events.filter((event) => {
 }).sort((a, b) => (a.start || a.date).localeCompare(b.start || b.date) || a.title.localeCompare(b.title));
 const directory = path.join(outputRoot, monday);
 await fs.mkdir(directory, { recursive: true });
+const publishAssets = process.argv.includes('--publish-assets');
+const publicDirectory = path.resolve('public', 'newsletter', monday);
+if (publishAssets) await fs.mkdir(publicDirectory, { recursive: true });
 const events = [];
 for (const [index, event] of selected.entries()) {
+  const poster = await posterFor(event, directory, index);
+  if (poster) {
+    poster.publicUrl = `${SITE}/newsletter/${monday}/${poster.fileName}`;
+    if (publishAssets) await fs.copyFile(poster.path, path.join(publicDirectory, poster.fileName));
+  }
   events.push({
     id: event.id,
     title: cleanText(event.title),
     when: when(event),
     location: cleanText(event.location),
     description: cleanText(event.description),
+    tags: [...new Set((Array.isArray(event.tags) ? event.tags : []).map(cleanText).filter(Boolean))],
     pageUrl: `${SITE}/#event-${event.id}`,
     eventUrl: safeUrl(event.eventUrl),
-    poster: await posterFor(event, directory, index),
+    poster,
   });
 }
 const label = `${new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${monday}T12:00:00Z`))}–${new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${sunday}T12:00:00Z`))}`;
@@ -129,4 +139,5 @@ const issue = { weekStart: monday, weekEnd: sunday, label, subject: `School of A
 await fs.writeFile(path.join(directory, 'issue.json'), `${JSON.stringify(issue, null, 2)}\n`);
 await fs.writeFile(path.join(directory, 'issue.txt'), `${renderText(issue)}\n`);
 await fs.writeFile(path.join(directory, 'preview.html'), renderHtml(issue));
+await fs.writeFile(path.join(directory, 'email.html'), renderHtml(issue, true));
 console.log(JSON.stringify({ weekStart: monday, weekEnd: sunday, eventCount: events.length, posterCount: events.filter((event) => event.poster).length, directory }));
