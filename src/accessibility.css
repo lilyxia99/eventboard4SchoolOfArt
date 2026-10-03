@@ -1,7 +1,36 @@
 /* Keep supporting labels readable while preserving the small editorial caps. */
 :root { --paper: #f5f7fa; --line: #cbd2dd; background: #f5f7fa; }
 .hero-copy .eyebrow { text-transform: none; letter-spacing: .02em; }
-.events-section { background: #e9edf3; }
+.events-section {
+  color: #fff;
+  background-color: #14243e;
+  background-image: linear-gradient(rgba(8, 22, 47, .69), rgba(8, 22, 47, .77)), url('/benjamin-auditorium-events-bg.png');
+  background-position: center;
+  background-size: cover;
+}
+.events-section .section-heading { border-color: rgba(255, 255, 255, .55); }
+.events-section .section-heading .eyebrow,
+.events-section .update-note { color: #fff; }
+.events-section .update-note span { color: #ffe3a3; }
+.events-section .filter-panel {
+  padding: 1rem 1.25rem;
+  background: rgba(250, 251, 253, .97);
+  color: #182238;
+  border: 1px solid rgba(255, 255, 255, .8);
+}
+.events-section .event-card {
+  color: #181916;
+  box-shadow: 0 8px 24px rgba(5, 14, 31, .18);
+}
+.events-section .loading-state,
+.events-section .empty-state {
+  color: #fff;
+  background: rgba(8, 22, 47, .82);
+}
+.events-section .calendar-footnote,
+.events-section .calendar-footnote a { color: #fff; }
+.events-section .calendar-footnote a { border-color: #fff; }
+.events-section .calendar-footnote span { color: #ffe3a3; }
 .hero-art { background: #e3e9f2; }
 .section-heading { border-color: #c7d0dd; }
 .event-poster { background: #dce2eb; }

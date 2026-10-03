@@ -1,10 +1,12 @@
 const grid = document.querySelector('#event-grid');
 const tagFilters = document.querySelector('#tag-filters');
+const highlightFilters = document.querySelector('#highlight-filters');
 const timeFilters = document.querySelector('#time-filters');
 const filterSummary = document.querySelector('#filter-summary');
 let allEvents = [];
 let visibleEvents = [];
 const selectedTags = new Set();
+const selectedHighlights = new Set();
 let activeTimeFilter = 'upcoming';
 let calendarEvents = [];
 let currentEventId = '';
@@ -137,7 +139,9 @@ function render() {
   const events = allEvents.filter((event) => {
     const past = isPastEvent(event, now);
     const matchesTime = activeTimeFilter === 'all' || (activeTimeFilter === 'past' ? past : !past);
-    return matchesTime && (!selectedTags.size || [...selectedTags].some((tag) => eventTags(event).includes(tag)));
+    return matchesTime
+      && (!selectedTags.size || [...selectedTags].some((tag) => eventTags(event).includes(tag)))
+      && (!selectedHighlights.size || [...selectedHighlights].some((tag) => eventHighlightTags(event).includes(tag)));
   });
   visibleEvents = events;
   if (!events.length) {
@@ -155,6 +159,7 @@ function render() {
       <div class="card-meta"><span class="card-category">${escapeHTML(event.type || event.category || 'Event')}</span><span>${escapeHTML(date)}</span></div>
       <h3>${escapeHTML(event.title)}</h3>
       ${eventTags(event).length ? `<div class="card-tags" aria-label="Event tags">${eventTags(event).map((tag) => tagMarkup(event, tag)).join('')}</div>` : ''}
+      ${eventHighlightTags(event).length ? `<div class="card-highlights" aria-label="Highlight tags"><span class="highlight-label">Highlights</span>${eventHighlightTags(event).map((tag) => highlightTagMarkup(event, tag)).join('')}</div>` : ''}
       <p class="event-description">${escapeHTML(event.description || '')}</p>
       <div class="event-details"><span>${escapeHTML(event.time || '')}</span><span class="event-location">${escapeHTML(event.location || '')}</span>${eventLink ? `<a class="card-event-link" href="${escapeHTML(eventLink)}" target="_blank" rel="noopener noreferrer">Event link ↗</a>` : ''}<span class="card-open-hint">View full details ↗</span></div>
     </article>`;
@@ -162,15 +167,25 @@ function render() {
 }
 
 const eventTags = (event) => [...new Set((Array.isArray(event.tags) && event.tags.length ? event.tags : [event.type || event.category]).map((tag) => String(tag || '').trim()).filter(Boolean))];
+const eventHighlightTags = (event) => [...new Set((Array.isArray(event.highlightTags) ? event.highlightTags : []).map((tag) => String(tag || '').trim()).filter(Boolean))];
+const highlightTagMarkup = (event, tag) => `<span class="event-tag highlight-tag${tagColorClass(event.highlightTagColors?.[tag])}">${escapeHTML(tag)}</span>`;
 function renderFilters() {
   const tags = [...new Set(allEvents.flatMap(eventTags))].sort((a, b) => a.localeCompare(b));
   for (const selected of selectedTags) if (!tags.includes(selected)) selectedTags.delete(selected);
+  const highlights = [...new Set(allEvents.flatMap(eventHighlightTags))].sort((a, b) => a.localeCompare(b));
+  for (const selected of selectedHighlights) if (!highlights.includes(selected)) selectedHighlights.delete(selected);
   tagFilters.innerHTML = `<button type="button" class="filter-button${selectedTags.size ? '' : ' is-active'}" data-tag-all aria-pressed="${!selectedTags.size}">All tags</button>${tags.map((tag) => {
     const color = allEvents.find((event) => event.tagColors?.[tag])?.tagColors[tag];
     return `<button type="button" class="filter-button${tagColorClass(color)}${selectedTags.has(tag) ? ' is-active' : ''}" data-tag="${escapeHTML(tag)}" aria-pressed="${selectedTags.has(tag)}">${escapeHTML(tag)}</button>`;
   }).join('')}`;
+  highlightFilters.innerHTML = `<button type="button" class="filter-button${selectedHighlights.size ? '' : ' is-active'}" data-highlight-all aria-pressed="${!selectedHighlights.size}">All highlights</button>${highlights.map((tag) => {
+    const color = allEvents.find((event) => event.highlightTagColors?.[tag])?.highlightTagColors[tag];
+    return `<button type="button" class="filter-button${tagColorClass(color)}${selectedHighlights.has(tag) ? ' is-active' : ''}" data-highlight="${escapeHTML(tag)}" aria-pressed="${selectedHighlights.has(tag)}">${escapeHTML(tag)}</button>`;
+  }).join('')}`;
   const timeLabel = { upcoming: 'Upcoming', past: 'Past events', all: 'All dates' }[activeTimeFilter];
-  filterSummary.textContent = `${timeLabel} · ${selectedTags.size ? `${selectedTags.size} tags` : 'All tags'}`;
+  const tagSummary = selectedTags.size ? `${selectedTags.size} tags` : 'All tags';
+  const highlightSummary = selectedHighlights.size ? `${selectedHighlights.size} highlights` : 'All highlights';
+  filterSummary.textContent = `${timeLabel} · ${tagSummary} · ${highlightSummary}`;
 }
 
 function relatedLinks(event) {
@@ -192,6 +207,7 @@ function openEvent(event) {
     <div class="event-dialog-copy"><p class="event-dialog-category">${escapeHTML(event.type || event.category || 'Event')} · ${escapeHTML(date)}</p>
       <h2 id="event-dialog-title">${escapeHTML(event.title)}</h2>
       ${eventTags(event).length ? `<div class="event-dialog-tags" aria-label="Event tags">${eventTags(event).map((tag) => tagMarkup(event, tag)).join('')}</div>` : ''}
+      ${eventHighlightTags(event).length ? `<div class="event-dialog-highlights" aria-label="Highlight tags"><span class="highlight-label">Highlights</span>${eventHighlightTags(event).map((tag) => highlightTagMarkup(event, tag)).join('')}</div>` : ''}
       <dl class="event-dialog-facts"><div><dt>When</dt><dd>${escapeHTML(date)}</dd></div><div><dt>Where</dt><dd>${escapeHTML(event.location || 'See event details')}</dd></div></dl>
       <p class="event-dialog-description">${escapeHTML(event.description || '')}</p>${relatedLinks(event)}
       <button class="download-ics" type="button" ${event.start ? '' : 'disabled title="Add a date in Notion to enable download"'}>Download .ics</button>
@@ -243,6 +259,15 @@ tagFilters.addEventListener('click', (click) => {
   if (button.hasAttribute('data-tag-all')) selectedTags.clear();
   else if (selectedTags.has(button.dataset.tag)) selectedTags.delete(button.dataset.tag);
   else selectedTags.add(button.dataset.tag);
+  renderFilters();
+  render();
+});
+highlightFilters.addEventListener('click', (click) => {
+  const button = click.target.closest('button');
+  if (!button) return;
+  if (button.hasAttribute('data-highlight-all')) selectedHighlights.clear();
+  else if (selectedHighlights.has(button.dataset.highlight)) selectedHighlights.delete(button.dataset.highlight);
+  else selectedHighlights.add(button.dataset.highlight);
   renderFilters();
   render();
 });

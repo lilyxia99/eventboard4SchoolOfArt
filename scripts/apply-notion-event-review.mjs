@@ -4,6 +4,7 @@ import { getSyncNotionPages, updateNotionPage } from '../netlify/functions/notio
 const DATA_SOURCE_ID = '3ed401da-165b-80e5-9451-000baea544b7';
 const NOTION_VERSION = '2025-09-03';
 const TYPES = new Set(['Exhibition', 'Workshop', 'Screening', 'Lecture', 'Visiting Artist', 'Other']);
+const HIGHLIGHTS = new Set(['snacks', 'Free', 'Ticketed', 'RSVP', 'accessibility']);
 const text = (value) => ({ rich_text: value ? [{ text: { content: value } }] : [] });
 const richText = (items) => (items || []).map((item) => item.plain_text || item.text?.content || '').join('');
 const sameDate = (left, right) => left && right ? Date.parse(left) === Date.parse(right) : !left && !right;
@@ -14,6 +15,7 @@ function validateEvent(event) {
     if (typeof event[field] !== 'string' || !event[field].trim() || event[field].length > 1900) throw new Error(`Invalid ${field}.`);
   }
   if (!TYPES.has(event.type)) throw new Error('Unsupported event type.');
+  if (event.highlightTags !== undefined && (!Array.isArray(event.highlightTags) || event.highlightTags.some((tag) => !HIGHLIGHTS.has(tag)))) throw new Error('Unsupported highlight tag.');
   if (event.start && (typeof event.start !== 'string' || Number.isNaN(Date.parse(event.start)))) throw new Error('Invalid start date.');
   if (event.end && (!event.start || typeof event.end !== 'string' || Number.isNaN(Date.parse(event.end)) || Date.parse(event.end) <= Date.parse(event.start))) throw new Error('Invalid end date.');
   if (event.eventUrl && (typeof event.eventUrl !== 'string' || new URL(event.eventUrl).protocol !== 'https:')) throw new Error('Event link must use HTTPS.');
@@ -25,6 +27,7 @@ function eventProperties(event, sourceId, number) {
     'Name of the event': { title: [{ text: { content: event.title.trim() } }] },
     Select: { status: { name: 'In progress' } },
     Type: { multi_select: [{ name: event.type }] },
+    ...(Array.isArray(event.highlightTags) ? { Highlights: { multi_select: [...new Set(event.highlightTags.map((tag) => tag.trim()).filter(Boolean))].map((name) => ({ name })) } } : {}),
     Date: { date: event.start ? { start: event.start, ...(event.end ? { end: event.end } : {}) } : null },
     'Location ': text(event.location?.trim() || ''),
     'Published description': text(event.description.trim()),
@@ -71,6 +74,7 @@ for (const [index, event] of review.events.entries()) {
     if (current.Select?.status?.name === 'Done' && current['Source event number']?.number === number) continue;
     const same = richText(current['Name of the event']?.title) === event.title.trim()
       && current.Type?.multi_select?.[0]?.name === event.type
+      && (!Array.isArray(event.highlightTags) || JSON.stringify((current.Highlights?.multi_select || []).map((item) => item.name).sort()) === JSON.stringify([...new Set(event.highlightTags.map((tag) => tag.trim()).filter(Boolean))].sort()))
       && sameDate(current.Date?.date?.start, event.start)
       && sameDate(current.Date?.date?.end, event.end)
       && richText(current['Location ']?.rich_text) === (event.location?.trim() || '')

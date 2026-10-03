@@ -90,6 +90,10 @@
 .filter-label{margin:.9rem 0 0;font:700 .8rem var(--mono);color:#595951}.filter-label+.filters{padding-top:.55rem;padding-bottom:.4rem}
 .wordmark-image{display:block;width:auto;height:54px;max-width:min(220px,42vw);object-fit:contain}.wordmark:focus-visible{outline:3px solid var(--blue);outline-offset:4px}@media(max-width:600px){.wordmark-image{height:46px;max-width:48vw}}
 .card-tags{display:flex;flex-wrap:wrap;gap:.4rem;margin:0 1rem .7rem}.card-tags .event-tag{font-size:.875rem;line-height:1.3}
+.card-highlights,.event-dialog-highlights{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin:0 1rem .8rem}
+.event-dialog-highlights{margin:0 0 1.25rem}
+.highlight-label{font:700 .72rem var(--mono);letter-spacing:.04em;text-transform:uppercase;color:#595951;margin-right:.15rem}
+.highlight-tag{border-style:dashed!important;font-weight:700}
 
 /* Notion's select colors, with dark text for readable tags and filters. */
 .notion-color-default{--tag-bg:#f1f1ef;--tag-ink:#37352f;--tag-border:#d9d9d6}
