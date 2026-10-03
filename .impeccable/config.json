@@ -20,6 +20,12 @@
         ],
         "createdAt": "2026-10-03T04:20:30.815Z",
         "reason": "Agent decision: thank-you page intentionally matches the existing site paper background #f4f0e7 in src/style.css"
+      },
+      {
+        "rule": "overused-font",
+        "value": "geist",
+        "createdAt": "2026-10-03T05:03:04.435Z",
+        "reason": "Geist Pixel is an intentional pixel-style face in the current design; matching the base Geist name is a false positive."
       }
     ]
   }
