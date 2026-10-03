@@ -22,6 +22,9 @@ const imageDialog = document.querySelector('#image-dialog');
 const imageDialogStage = document.querySelector('#image-dialog-stage');
 
 const escapeHTML = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+const notionColors = new Set(['default', 'gray', 'brown', 'orange', 'yellow', 'green', 'blue', 'purple', 'pink', 'red']);
+const tagColorClass = (color) => notionColors.has(color) ? ` notion-color-${color}` : ' notion-color-default';
+const tagMarkup = (event, tag) => `<span class="event-tag${tagColorClass(event.tagColors?.[tag])}">${escapeHTML(tag)}</span>`;
 const safeURL = (value) => { if (typeof value !== 'string' || !value.trim()) return ''; try { const url = new URL(value, window.location.origin); return ['https:', 'http:'].includes(url.protocol) ? url.href : ''; } catch { return ''; } };
 const formatDate = (value) => {
   if (!value) return 'Date to be announced';
@@ -151,7 +154,7 @@ function render() {
       ${poster ? `<div class="event-poster has-image"><button class="poster-open" type="button" data-index="${index}" aria-label="Enlarge poster for ${escapeHTML(event.title)}" aria-haspopup="dialog"><img src="${escapeHTML(poster)}" alt="${escapeHTML(event.posterAlt || `Poster for ${event.title}`)}" loading="lazy" referrerpolicy="no-referrer"></button></div>` : ''}
       <div class="card-meta"><span class="card-category">${escapeHTML(event.type || event.category || 'Event')}</span><span>${escapeHTML(date)}</span></div>
       <h3>${escapeHTML(event.title)}</h3>
-      ${eventTags(event).length ? `<div class="card-tags" aria-label="Event tags">${eventTags(event).map((tag) => `<span class="event-tag">${escapeHTML(tag)}</span>`).join('')}</div>` : ''}
+      ${eventTags(event).length ? `<div class="card-tags" aria-label="Event tags">${eventTags(event).map((tag) => tagMarkup(event, tag)).join('')}</div>` : ''}
       <p class="event-description">${escapeHTML(event.description || '')}</p>
       <div class="event-details"><span>${escapeHTML(event.time || '')}</span><span class="event-location">${escapeHTML(event.location || '')}</span>${eventLink ? `<a class="card-event-link" href="${escapeHTML(eventLink)}" target="_blank" rel="noopener noreferrer">Event link ↗</a>` : ''}<span class="card-open-hint">View full details ↗</span></div>
     </article>`;
@@ -162,7 +165,10 @@ const eventTags = (event) => [...new Set((Array.isArray(event.tags) && event.tag
 function renderFilters() {
   const tags = [...new Set(allEvents.flatMap(eventTags))].sort((a, b) => a.localeCompare(b));
   for (const selected of selectedTags) if (!tags.includes(selected)) selectedTags.delete(selected);
-  tagFilters.innerHTML = `<button type="button" class="filter-button${selectedTags.size ? '' : ' is-active'}" data-tag-all aria-pressed="${!selectedTags.size}">All tags</button>${tags.map((tag) => `<button type="button" class="filter-button${selectedTags.has(tag) ? ' is-active' : ''}" data-tag="${escapeHTML(tag)}" aria-pressed="${selectedTags.has(tag)}">${escapeHTML(tag)}</button>`).join('')}`;
+  tagFilters.innerHTML = `<button type="button" class="filter-button${selectedTags.size ? '' : ' is-active'}" data-tag-all aria-pressed="${!selectedTags.size}">All tags</button>${tags.map((tag) => {
+    const color = allEvents.find((event) => event.tagColors?.[tag])?.tagColors[tag];
+    return `<button type="button" class="filter-button${tagColorClass(color)}${selectedTags.has(tag) ? ' is-active' : ''}" data-tag="${escapeHTML(tag)}" aria-pressed="${selectedTags.has(tag)}">${escapeHTML(tag)}</button>`;
+  }).join('')}`;
   const timeLabel = { upcoming: 'Upcoming', past: 'Past events', all: 'All dates' }[activeTimeFilter];
   filterSummary.textContent = `${timeLabel} · ${selectedTags.size ? `${selectedTags.size} tags` : 'All tags'}`;
 }
@@ -185,7 +191,7 @@ function openEvent(event) {
     ${poster ? `<button class="event-dialog-poster" type="button" aria-label="Enlarge poster for ${escapeHTML(event.title)}"><img src="${escapeHTML(poster)}" alt="${escapeHTML(event.posterAlt || `Poster for ${event.title}`)}"></button>` : ''}
     <div class="event-dialog-copy"><p class="event-dialog-category">${escapeHTML(event.type || event.category || 'Event')} · ${escapeHTML(date)}</p>
       <h2 id="event-dialog-title">${escapeHTML(event.title)}</h2>
-      ${eventTags(event).length ? `<div class="event-dialog-tags" aria-label="Event tags">${eventTags(event).map((tag) => `<span class="event-tag">${escapeHTML(tag)}</span>`).join('')}</div>` : ''}
+      ${eventTags(event).length ? `<div class="event-dialog-tags" aria-label="Event tags">${eventTags(event).map((tag) => tagMarkup(event, tag)).join('')}</div>` : ''}
       <dl class="event-dialog-facts"><div><dt>When</dt><dd>${escapeHTML(date)}</dd></div><div><dt>Where</dt><dd>${escapeHTML(event.location || 'See event details')}</dd></div></dl>
       <p class="event-dialog-description">${escapeHTML(event.description || '')}</p>${relatedLinks(event)}
       <button class="download-ics" type="button" ${event.start ? '' : 'disabled title="Add a date in Notion to enable download"'}>Download .ics</button>
