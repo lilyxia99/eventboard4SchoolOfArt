@@ -90,3 +90,4 @@
 @media(max-width:600px){.site-header{height:auto;min-height:66px;gap:.75rem;flex-wrap:wrap;padding-block:.7rem}.header-actions{gap:.75rem;flex-wrap:wrap}}
 .filter-label{margin:.9rem 0 0;font:700 .8rem var(--mono);color:#595951}.filter-label+.filters{padding-top:.55rem;padding-bottom:.4rem}
 .wordmark-image{display:block;width:auto;height:54px;max-width:min(220px,42vw);object-fit:contain}.wordmark:focus-visible{outline:3px solid var(--blue);outline-offset:4px}@media(max-width:600px){.wordmark-image{height:46px;max-width:48vw}}
+.card-tags{display:flex;flex-wrap:wrap;gap:.4rem;margin:0 1rem .7rem}.card-tags .event-tag{font-size:.875rem;line-height:1.3}

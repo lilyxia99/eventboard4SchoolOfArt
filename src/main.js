@@ -151,6 +151,7 @@ function render() {
       ${poster ? `<div class="event-poster has-image"><button class="poster-open" type="button" data-index="${index}" aria-label="Enlarge poster for ${escapeHTML(event.title)}" aria-haspopup="dialog"><img src="${escapeHTML(poster)}" alt="${escapeHTML(event.posterAlt || `Poster for ${event.title}`)}" loading="lazy" referrerpolicy="no-referrer"></button></div>` : ''}
       <div class="card-meta"><span class="card-category">${escapeHTML(event.type || event.category || 'Event')}</span><span>${escapeHTML(date)}</span></div>
       <h3>${escapeHTML(event.title)}</h3>
+      ${eventTags(event).length ? `<div class="card-tags" aria-label="Event tags">${eventTags(event).map((tag) => `<span class="event-tag">${escapeHTML(tag)}</span>`).join('')}</div>` : ''}
       <p class="event-description">${escapeHTML(event.description || '')}</p>
       <div class="event-details"><span>${escapeHTML(event.time || '')}</span><span class="event-location">${escapeHTML(event.location || '')}</span>${eventLink ? `<a class="card-event-link" href="${escapeHTML(eventLink)}" target="_blank" rel="noopener noreferrer">Event link ↗</a>` : ''}<span class="card-open-hint">View full details ↗</span></div>
     </article>`;
