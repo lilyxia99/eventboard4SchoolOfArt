@@ -11,6 +11,15 @@
         ],
         "createdAt": "2026-10-01T13:07:47.746Z",
         "reason": "Agent: hero-art text is positioned with percentage inset from the colored edge, so the wrapper needs no padding"
+      },
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          "public/newsletter-thanks.html"
+        ],
+        "createdAt": "2026-10-03T04:20:30.815Z",
+        "reason": "Agent decision: thank-you page intentionally matches the existing site paper background #f4f0e7 in src/style.css"
       }
     ]
   }
